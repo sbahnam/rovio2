@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?> 
+<launch>
+  <node pkg="rovio" type="rovio_node" name="rovio" output="screen">
+  <param name="filter_config" value="$(find rovio)/cfg/rovio_uzhfpv.info"/>
+  <param name="camera0_config" value="$(find rovio)/cfg/uzhfpv_cam0.yaml"/>
+  <!-- <param name="camera1_config" value="$(find rovio)/cfg/uzhfpv_cam1.yaml"/> -->
+  <!-- <param name="rosbag_filename" value="/home/stavrow/fpv_dataset/indoor_forward_3_snapdragon_with_gt.bag"/> -->
+  <!-- <param name="imu_topic_name" value="/snappy_imu"/> -->
+  <!-- <param name="cam0_topic_name" value="/snappy_cam/stereo_l"/> -->
+  <!-- <param name="cam1_topic_name" value="/snappy_cam/stereo_r"/> -->
+  </node>
+</launch>
+
+<!-- _with_gt -->

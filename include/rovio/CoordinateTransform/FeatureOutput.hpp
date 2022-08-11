@@ -185,6 +185,10 @@ class TransformFeatureOutputCT:public LWF::CoordinateTransform<STATE,FeatureOutp
       J.template block<1,1>(mtOutput::template getId<mtOutput::_fea>()+2,mtInput::template getId<mtInput::_fea>(ID_)+2) = Eigen::Matrix<double,1,1>::Identity();
     }
   }
+  int getZeros()
+  {
+    return mtInput::template getId<mtInput::_fea>(ID_);
+  }
 };
 
 }

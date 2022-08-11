@@ -59,6 +59,7 @@ class MultilevelPatchAlignment {
   bool useIntensityOffset_; /**<Should an intensity offset between the patches be considered.*/
   bool useIntensitySqew_; /**<Should an intensity sqewing between the patches be considered.*/
   float gradientExponent_;  /**<Exponent used for gradient based weighting of residuals.*/
+  mutable bool skip_gradient;
 
   /** \brief Constructor
    */
@@ -137,7 +138,8 @@ class MultilevelPatchAlignment {
     for(int l = l1; l <= l2; l++){
       const auto c_level = pyr.levelTranformCoordinates(c,0,l);
       if(mp.isValidPatch_[l] && extractedPatches_[l].isPatchInFrame(pyr.imgs_[l],c_level,false)){
-        mp.patches_[l].computeGradientParameters();
+        if (!skip_gradient)
+          mp.patches_[l].computeGradientParameters();
         if(mp.patches_[l].validGradientParameters_){
           mlpError_.isValidPatch_[l] = true;
           numLevel++;
@@ -336,7 +338,8 @@ class MultilevelPatchAlignment {
    * @return true, if successful.
    */
   bool getLinearAlignEquationsReduced(const ImagePyramid<nLevels>& pyr, const MultilevelPatch<nLevels,patch_size>& mp, const FeatureCoordinates& c, const int l1, const int l2,
-                                      Eigen::Matrix2d& A_red, Eigen::Vector2d& b_red){
+                                      Eigen::Matrix2d& A_red, Eigen::Vector2d& b_red, bool& itered){
+    skip_gradient = itered;
     Eigen::Matrix2f A_red_;
     Eigen::Vector2f b_red_;
     bool success = getLinearAlignEquationsReduced(pyr,mp,c,l1,l2,A_red_,b_red_);

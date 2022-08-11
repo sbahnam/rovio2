@@ -228,19 +228,19 @@ class PoseUpdate: public LWF::Update<PoseInnovation,FILTERSTATE,PoseUpdateMeas,P
     // IrIV = IrIW + qWI^T*(WrWM + qWM*MrMV)
     // qVI = qVM*qWM^T*qWI
     if(enablePosition_){
-      y.pos() = get_IrIW(state) + get_qWI(state).inverseRotate(V3D(state.WrWM()+state.qWM().rotate(get_MrMV(state)))) - meas_.pos() + noise.pos();
+      y.pos() = get_IrIW(state) + get_qWI(state).inverseRotate(V3D(state.WrWM()+state.qWM().rotate(get_MrMV(state)))) - meas_->pos() + noise.pos();
     } else {
       y.pos() = noise.pos();
     }
     if(enableAttitude_){
       QPD attNoise = attNoise.exponentialMap(noise.att());
-      y.att() = attNoise*get_qVM(state)*state.qWM().inverted()*get_qWI(state)*meas_.att().inverted();
+      y.att() = attNoise*get_qVM(state)*state.qWM().inverted()*get_qWI(state)*meas_->att().inverted();
     } else {
       QPD attNoise = attNoise.exponentialMap(noise.att());
       y.att() = attNoise;
     }
   }
-  void jacState(MXD& F, const mtState& state) const{
+  void jacState(MXD& F, const mtState& state, bool& itered) const{
     F.setZero();
     if(enablePosition_){
       if(!noFeedbackToRovio_){

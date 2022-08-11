@@ -164,7 +164,7 @@ class VelocityUpdate: public LWF::Update<VelocityInnovation,FILTERSTATE,Velocity
    *  @param dt           - Not used.
    */
   void evalInnovation(mtInnovation& y, const mtState& state, const mtNoise& noise) const{
-    y.vel() = qAM_.rotate(state.MvM()) + meas_.vel() + noise.vel(); // Velocity of state has a minus sign
+    y.vel() = qAM_.rotate(state.MvM()) + meas_->vel() + noise.vel(); // Velocity of state has a minus sign
   }
 
   /** \brief Computes the Jacobian for the update step of the filter.
@@ -174,7 +174,7 @@ class VelocityUpdate: public LWF::Update<VelocityInnovation,FILTERSTATE,Velocity
    *  @param meas  - Not used.
    *  @param dt    - Not used.
    */
-  void jacState(MXD& F, const mtState& state) const{
+  void jacState(MXD& F, const mtState& state, bool& itered) const{
     F.setZero();
     F.template block<3,3>(mtInnovation::template getId<mtInnovation::_vel>(),mtState::template getId<mtState::_vel>()) = MPD(qAM_).matrix();
   }

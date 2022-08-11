@@ -125,7 +125,7 @@ class FeatureTrackerNode{
     pyr_.computeFromImage(img_,true);
 
     // Drawing
-    cvtColor(img_, draw_image_, CV_GRAY2RGB);
+    cvtColor(img_, draw_image_, cv::COLOR_GRAY2BGR);
     const int numPatchesPlot = 10;
     draw_patches_ = cv::Mat::zeros(numPatchesPlot*(patchSize_*pow(2,nLevels_-1)+4),3*(patchSize_*pow(2,nLevels_-1)+4),CV_8UC1);
 
@@ -231,9 +231,9 @@ class FeatureTrackerNode{
       FeatureCoordinatesVec candidates;
       ROS_INFO_STREAM(" Adding keypoints");
       const double t1 = (double) cv::getTickCount();
-      for(int l=l1;l<=l2;l++){
-        pyr_.detectFastCorners(candidates,l,detectionThreshold);
-      }
+      // for(int l=l1;l<=l2;l++){
+      //   pyr_.detectFastCorners(candidates,l,detectionThreshold);
+      // }
       const double t2 = (double) cv::getTickCount();
       ROS_INFO_STREAM(" == Detected " << candidates.size() << " on levels " << l1 << "-" << l2 << " (" << (t2-t1)/cv::getTickFrequency()*1000 << " ms)");
 //      pruneCandidates(fsm_,candidates,0);
