@@ -59,6 +59,10 @@
 #include "rovio/CoordinateTransform/YprOutput.hpp"
 #include "rovio/CoordinateTransform/LandmarkOutput.hpp"
 
+#define IMG_CALLBACK_LOG
+#define TIME_LOG
+#define SAVE_VIO_TO_TXT
+
 namespace rovio {
 
 /** \brief Class, defining the Rovio Node
@@ -501,14 +505,16 @@ class RovioNode{
    *   @param camID - Camera ID.
    */
   void imgCallback(const sensor_msgs::ImageConstPtr & img, const int camID = 0){
-    double t2;
-    double t3;
-    double t4;
-    double t5;
-    double t6;
-    double t7;
-    double t8;
-    const double t1 = (double) cv::getTickCount();
+    #ifdef IMG_CALLBACK_LOG
+      double t2;
+      double t3;
+      double t4;
+      double t5;
+      double t6;
+      double t7;
+      double t8;
+      const double t1 = (double) cv::getTickCount();
+    #endif
     // Get image from msg
     cv_bridge::CvImagePtr cv_ptr;
     try {
@@ -517,9 +523,13 @@ class RovioNode{
       ROS_ERROR("cv_bridge exception: %s", e.what());
       return;
     }
-    t3 = (double) cv::getTickCount();
+    #ifdef IMG_CALLBACK_LOG
+      t3 = (double) cv::getTickCount();
+    #endif
     cv::Mat cv_img;
-    t4 = (double) cv::getTickCount();
+    #ifdef IMG_CALLBACK_LOG
+      t4 = (double) cv::getTickCount();
+    #endif
     cv_ptr->image.copyTo(cv_img);
     if(init_state_.isInitialized() && !cv_img.empty()){
       double msgTime = img->header.stamp.toSec();
@@ -531,30 +541,40 @@ class RovioNode{
         }
         imgUpdateMeas_.template get<mtImgMeas::_aux>().reset(msgTime);
       }
-      t5 = (double) cv::getTickCount();
+      #ifdef IMG_CALLBACK_LOG
+        t5 = (double) cv::getTickCount();
+      #endif
       imgUpdateMeas_.template get<mtImgMeas::_aux>().pyr_[camID].computeFromImage(cv_img,true);
-      t6 = (double) cv::getTickCount();
+      #ifdef IMG_CALLBACK_LOG
+        t6 = (double) cv::getTickCount();
+      #endif
       imgUpdateMeas_.template get<mtImgMeas::_aux>().isValidPyr_[camID] = true;
-      t7 = (double) cv::getTickCount();
+      #ifdef IMG_CALLBACK_LOG
+        t7 = (double) cv::getTickCount();
+      #endif
 
       if(imgUpdateMeas_.template get<mtImgMeas::_aux>().areAllValid()){
         mpFilter_->template addUpdateMeas<0>(imgUpdateMeas_,msgTime);
-        t8 = (double) cv::getTickCount();
+        #ifdef IMG_CALLBACK_LOG
+          t8 = (double) cv::getTickCount();
+        #endif
         imgUpdateMeas_.template get<mtImgMeas::_aux>().reset(msgTime);
 
-        t2 = (double) cv::getTickCount();
-        double T_img = (t2-t1)/cv::getTickFrequency()*1000;
-        double T_cvptr = (t3-t1)/cv::getTickFrequency()*1000;
-        double T_cvcopy = (t4-t3)/cv::getTickFrequency()*1000;
-        double T_getaux = (t5-t4)/cv::getTickFrequency()*1000;
-        double T_compute = (t6-t5)/cv::getTickFrequency()*1000;
-        double T_valid = (t7-t6)/cv::getTickFrequency()*1000;
-        double T_addupdate = (t8-t7)/cv::getTickFrequency()*1000;
-        double T_reset = (t2-t8)/cv::getTickFrequency()*1000;        std::ofstream node_img;
-        node_img.open ("/home/stavrow/fpv_dataset/results/node_image_logg.txt", std::ios::app);
-        node_img << T_img << " " << T_cvptr << " " << T_cvcopy << " " << T_getaux << " " <<  T_compute << " "<<
-          T_valid << " " << T_addupdate << " " << T_addupdate << " " << T_reset << std::endl;
-        node_img.close();
+        #ifdef IMG_CALLBACK_LOG
+          t2 = (double) cv::getTickCount();
+          double T_img = (t2-t1)/cv::getTickFrequency()*1000;
+          double T_cvptr = (t3-t1)/cv::getTickFrequency()*1000;
+          double T_cvcopy = (t4-t3)/cv::getTickFrequency()*1000;
+          double T_getaux = (t5-t4)/cv::getTickFrequency()*1000;
+          double T_compute = (t6-t5)/cv::getTickFrequency()*1000;
+          double T_valid = (t7-t6)/cv::getTickFrequency()*1000;
+          double T_addupdate = (t8-t7)/cv::getTickFrequency()*1000;
+          double T_reset = (t2-t8)/cv::getTickFrequency()*1000;        std::ofstream node_img;
+          node_img.open ("/home/stavrow/fpv_dataset/results/node_image_logg.txt", std::ios::app);
+          node_img << T_img << " " << T_cvptr << " " << T_cvcopy << " " << T_getaux << " " <<  T_compute << " "<<
+            T_valid << " " << T_addupdate << " " << T_addupdate << " " << T_reset << std::endl;
+          node_img.close();
+        #endif
 
         updateAndPublish();
       }
@@ -685,19 +705,21 @@ class RovioNode{
         ROS_INFO_STREAM(" == Filter Update: " << (t2-t1)/cv::getTickFrequency()*1000 << " ms for processing " << c1-c2 << " images, average: " << timing_T/timing_C);
       }
 
-      if (c2 != c1)
-      {
-        int features_count = 0; 
-        for (unsigned int i=0;i<mtState::nMax_; i++) {
-          if(mpFilter_->safe_.fsm_.isValid_[i]){
-            features_count++;
+      #ifdef TIME_LOG
+        if (c2 != c1)
+        {
+          int features_count = 0; 
+          for (unsigned int i=0;i<mtState::nMax_; i++) {
+            if(mpFilter_->safe_.fsm_.isValid_[i]){
+              features_count++;
+            }
           }
+          std::ofstream logfile;
+          logfile.open ("/home/stavrow/fpv_dataset/results/time_log.txt", std::ios::app);
+          logfile << features_count << " " << (t2-t1)/cv::getTickFrequency()*1000 <<std::endl;
+          logfile.close();
         }
-        std::ofstream logfile;
-        logfile.open ("/home/stavrow/fpv_dataset/results/time_log.txt", std::ios::app);
-        logfile << features_count << " " << (t2-t1)/cv::getTickFrequency()*1000 <<std::endl;
-        logfile.close();
-      }
+      #endif
 
       if(mpFilter_->safe_.t_ > oldSafeTime){ // Publish only if something changed
         for(int i=0;i<mtState::nCam_;i++){
@@ -713,19 +735,18 @@ class RovioNode{
 
         // Obtain the save filter state.
         mtFilterState& filterState = mpFilter_->safe_;
-	mtState& state = mpFilter_->safe_.state_;
+	      mtState& state = mpFilter_->safe_.state_;
         state.updateMultiCameraExtrinsics(&mpFilter_->multiCamera_);
         MXD& cov = mpFilter_->safe_.cov_;
         imuOutputCT_.transformState(state,imuOutput_);
 
 
-
-        // Yingfu output save traj
-        // std::cout <<std::fixed<<mpFilter_->safe_.t_<< " " << imuOutput_.WrWB()(0) << " " << imuOutput_.WrWB()(1)<< " " << imuOutput_.WrWB()(2)<< " " << imuOutput_.qBW().x()<< " " <<imuOutput_.qBW().y()<< " " <<imuOutput_.qBW().z()<< " " <<-imuOutput_.qBW().w()<< std::endl;
-        std::ofstream myfile;
-        myfile.open ("/home/stavrow/fpv_dataset/results/vio_estimate.txt", std::ios::app);
-        myfile <<std::fixed<<mpFilter_->safe_.t_<< " " << imuOutput_.WrWB()(0) << " " << imuOutput_.WrWB()(1)<< " " << imuOutput_.WrWB()(2)<< " " << imuOutput_.qBW().x()<< " " <<imuOutput_.qBW().y()<< " " <<imuOutput_.qBW().z()<< " " <<-imuOutput_.qBW().w() <<std::endl;
-        myfile.close();
+        #ifdef SAVE_VIO_TO_TXT
+          std::ofstream myfile;
+          myfile.open ("/home/stavrow/fpv_dataset/results/vio_estimate.txt", std::ios::app);
+          myfile <<std::fixed<<mpFilter_->safe_.t_<< " " << imuOutput_.WrWB()(0) << " " << imuOutput_.WrWB()(1)<< " " << imuOutput_.WrWB()(2)<< " " << imuOutput_.qBW().x()<< " " <<imuOutput_.qBW().y()<< " " <<imuOutput_.qBW().z()<< " " <<-imuOutput_.qBW().w() <<std::endl;
+          myfile.close();
+        #endif
 
         // Cout verbose for pose measurements
         if(mpImgUpdate_->verbose_){

@@ -231,9 +231,9 @@ class FeatureTrackerNode{
       FeatureCoordinatesVec candidates;
       ROS_INFO_STREAM(" Adding keypoints");
       const double t1 = (double) cv::getTickCount();
-      // for(int l=l1;l<=l2;l++){
-      //   pyr_.detectFastCorners(candidates,l,detectionThreshold);
-      // }
+      for(int l=l1;l<=l2;l++){
+        pyr_.detectFastCorners(candidates,l,detectionThreshold);
+      }
       const double t2 = (double) cv::getTickCount();
       ROS_INFO_STREAM(" == Detected " << candidates.size() << " on levels " << l1 << "-" << l2 << " (" << (t2-t1)/cv::getTickFrequency()*1000 << " ms)");
 //      pruneCandidates(fsm_,candidates,0);
