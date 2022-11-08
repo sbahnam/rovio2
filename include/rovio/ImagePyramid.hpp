@@ -136,7 +136,7 @@ class ImagePyramid{
    *                             See http://docs.opencv.org/trunk/df/d74/classcv_1_1FastFeatureDetector.html
    * @param valid_radius       - Radius inside which a feature is considered valid (as ratio of shortest image side)
    */
-  void detectFastCorners(FeatureCoordinatesVec & candidates, int l, int detectionThreshold, double valid_radius = std::numeric_limits<double>::max()) const{
+  void detectFastCorners(FeatureCoordinatesVec & candidates, std::vector<uint8_t>& fast_scores_, int l, int detectionThreshold, double valid_radius = std::numeric_limits<double>::max()) const{
     std::vector<cv::KeyPoint> keypoints;
 #if (CV_MAJOR_VERSION < 3)
     cv::FastFeatureDetector feature_detector_fast(detectionThreshold, true);
@@ -144,6 +144,22 @@ class ImagePyramid{
 #else
     auto feature_detector_fast = cv::FastFeatureDetector::create(detectionThreshold, true);
     feature_detector_fast->detect(imgs_[l], keypoints);
+    // static int count = 0;
+    // if (count == 0)
+    // {
+    //   cv::imwrite("/home/stavrow/test1.jpg", imgs_[l]);
+    //   // cv::imwrite("/home/stavrow/test1.jpg", imgs_[l])
+    //   std::cout<<keypoints.size()<<std::endl;
+    // }
+    // if (count == 1) 
+    // {
+    //   cv::imwrite("/home/stavrow/test2.jpg", imgs_[l]);
+    //   std::cout<<keypoints.size()<<std::endl;
+    // }
+    // // if (count == 2)  cv::imwrite("/home/stavrow/test3.jpg", imgs_[l]);
+    // // if (count == 3)  cv::imwrite("/home/stavrow/test4.jpg", imgs_[l]);
+    // count++;
+    // std::cout<<count<<std::endl;
 #endif
 
     candidates.reserve(candidates.size()+keypoints.size());
@@ -160,6 +176,7 @@ class ImagePyramid{
 
         candidates.push_back(
                 levelTranformCoordinates(FeatureCoordinates(cv::Point2f(it->pt.x, it->pt.y)),l,0));
+        fast_scores_.push_back(it->response);
       }
     }
     else
@@ -167,6 +184,8 @@ class ImagePyramid{
       for (auto it = keypoints.cbegin(), end = keypoints.cend(); it != end; ++it) {
         candidates.push_back(
                 levelTranformCoordinates(FeatureCoordinates(cv::Point2f(it->pt.x, it->pt.y)),l,0));
+    // if (count == 1)      std::cout<<it->pt.x<<", "<< it->pt.y<<std::endl;
+    fast_scores_.push_back(it->response);
       }
     }
   }

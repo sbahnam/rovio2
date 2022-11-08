@@ -37,6 +37,13 @@
 #include "algorithm"
 #include <tuple>
 #include <list>
+#include <iostream>
+#include <fstream>
+
+
+#include <vector>
+#include <numeric>      // std::iota
+#include <algorithm>    // std::sort, std::stable_sort
 
 namespace rovio{
 
@@ -281,40 +288,70 @@ class FeatureSetManager{
   // @todo work more on bearing vectors (in general)
   // @todo add corner motion dependency
   // @todo check inFrame, only if COVARIANCE not too large
-  std::unordered_set<unsigned int> addBestCandidates(const FeatureCoordinatesVec& candidates, const ImagePyramid<nLevels>& pyr, const int camID, const double initTime,
+
+  template <typename T>
+  std::vector<size_t> sort_indexes(const std::vector<T> &v) {
+
+    // initialize original index locations
+    std::vector<size_t> idx(v.size());
+    std::iota(idx.begin(), idx.end(), 0);
+
+    // sort indexes based on comparing values in v
+    // using std::stable_sort instead of std::sort
+    // to avoid unnecessary index re-orderings
+    // when v contains elements of equal values 
+    std::stable_sort(idx.begin(), idx.end(),
+        [&v](size_t i1, size_t i2) {return v[i1] < v[i2];});
+    
+    std::vector<size_t> test(idx.end() - 150, idx.end());
+    return test;
+  }
+// std::vector<int> y(x.end() - n, x.end())
+
+  std::unordered_set<unsigned int> addBestCandidates(const FeatureCoordinatesVec& candidates, std::vector<uint8_t>& fast_scores, const ImagePyramid<nLevels>& pyr, const int camID, const double initTime,
                                                      const int l1, const int l2, const int maxAddedFeature, const int nDetectionBuckets, const double scoreDetectionExponent,
                                                      const double penaltyDistance, const double zeroDistancePenalty, const bool requireMax, const float minScore){
     std::unordered_set<unsigned int> newFeatureIDs;
-    std::vector<MultilevelPatch<nLevels,patchSize>> multilevelPatches;
-    multilevelPatches.reserve(candidates.size());
 
     // Create MultilevelPatches from the candidates list and compute their Shi-Tomasi Score.
     float maxScore = -1.0;
-    for(int i=0;i<candidates.size();i++){
-      multilevelPatches.emplace_back();
-      if(multilevelPatches.back().isMultilevelPatchInFrame(pyr,candidates[i],l2,true)){
-        multilevelPatches.back().extractMultilevelPatchFromImage(pyr,candidates[i],l2,true);
-        multilevelPatches.back().computeMultilevelShiTomasiScore(l1,l2);
-        if(multilevelPatches.back().s_ > maxScore) maxScore = multilevelPatches.back().s_;
-      } else {
-        multilevelPatches.back().s_ = -1;
-      }
-    }
-    if(maxScore <= minScore){
-      return newFeatureIDs;
-    }
+
 
     // Make buckets and fill based on score
     std::vector<std::unordered_set<int>> buckets(nDetectionBuckets,std::unordered_set<int>());
     unsigned int newBucketID;
     float relScore;
+
+    if ( candidates.size() > 250)
+    {
+      std::vector<size_t> short_candidates = sort_indexes(fast_scores);
+      maxScore = fast_scores[short_candidates.back()];
+      for (auto i: short_candidates) {
+        relScore = (fast_scores[i]-minScore)/(maxScore-minScore);
+        if(relScore > 0.0){
+          newBucketID = std::ceil((nDetectionBuckets-1)*(pow(relScore,static_cast<float>(scoreDetectionExponent))));
+          if(newBucketID>nDetectionBuckets-1) newBucketID = nDetectionBuckets-1;
+          buckets[newBucketID].insert(i);
+        }
+      }
+    }
+    else
+    {
     for(int i=0;i<candidates.size();i++){
-      relScore = (multilevelPatches[i].s_-minScore)/(maxScore-minScore);
+        if (fast_scores[i] > maxScore) maxScore = fast_scores[i];
+    }
+    if(maxScore <= minScore){
+      return newFeatureIDs;
+    }
+    for(int i=0;i<candidates.size();i++){
+      // relScore = (multilevelPatches[i].s_-minScore)/(maxScore-minScore);
+      relScore = (fast_scores[i]-minScore)/(maxScore-minScore);
       if(relScore > 0.0){
         newBucketID = std::ceil((nDetectionBuckets-1)*(pow(relScore,static_cast<float>(scoreDetectionExponent))));
         if(newBucketID>nDetectionBuckets-1) newBucketID = nDetectionBuckets-1;
         buckets[newBucketID].insert(i);
       }
+    }
     }
 
     // Move buckets based on current features
@@ -355,31 +392,41 @@ class FeatureSetManager{
       while(!buckets[bucketID].empty() && addedCount < maxAddedFeature && getValidCount() != nMax) {
         const int nf = *(buckets[bucketID].begin());
         buckets[bucketID].erase(nf);
-        const int ind = makeNewFeature(camID);
-        features_[ind].mpCoordinates_->set_c(candidates[nf].get_c());
-        features_[ind].mpCoordinates_->camID_ = camID;
-        features_[ind].mpCoordinates_->set_warp_identity();
-        features_[ind].mpCoordinates_->mpCamera_ = &mpMultiCamera_->cameras_[camID];
-        *(features_[ind].mpMultilevelPatch_) = multilevelPatches[nf];
-        if(ind >= 0){
-          newFeatureIDs.insert(ind);
-        }
-        addedCount++;
-        for (unsigned int bucketID2 = 1;bucketID2 <= bucketID;bucketID2++) {
-          for (auto it_cand = buckets[bucketID2].begin();it_cand != buckets[bucketID2].end();) {
-            doDelete = false;
-            d2 = std::pow(candidates[nf].get_c().x - candidates[*it_cand].get_c().x,2) + std::pow(candidates[nf].get_c().y - candidates[*it_cand].get_c().y,2);
-            if(d2<t2){
-              newBucketID = std::max((int)(bucketID2 - (t2-d2)/t2*zeroDistancePenalty),0);
-              if(bucketID2 != newBucketID){
-                buckets[newBucketID].insert(*it_cand);
-                doDelete = true;
+        MultilevelPatch<nLevels,patchSize>  multilevelPatch;
+        if(multilevelPatch.isMultilevelPatchInFrame(pyr,candidates[nf],l2,true)){
+
+
+          const int ind = makeNewFeature(camID);
+          features_[ind].mpCoordinates_->set_c(candidates[nf].get_c());
+          features_[ind].mpCoordinates_->camID_ = camID;
+          features_[ind].mpCoordinates_->set_warp_identity();
+          features_[ind].mpCoordinates_->mpCamera_ = &mpMultiCamera_->cameras_[camID];
+
+          multilevelPatch.extractMultilevelPatchFromImage(pyr,candidates[nf],l2,true);
+          multilevelPatch.s_ =  fast_scores[nf];
+          *(features_[ind].mpMultilevelPatch_) = multilevelPatch;
+          if(ind >= 0){
+            newFeatureIDs.insert(ind);
+          }
+          // std::vector<int> v = { 4, 7, 5, 2, 6, 9 };
+      
+          addedCount++;
+          for (unsigned int bucketID2 = 1;bucketID2 <= bucketID;bucketID2++) {
+            for (auto it_cand = buckets[bucketID2].begin();it_cand != buckets[bucketID2].end();) {
+              doDelete = false;
+              d2 = std::pow(candidates[nf].get_c().x - candidates[*it_cand].get_c().x,2) + std::pow(candidates[nf].get_c().y - candidates[*it_cand].get_c().y,2);
+              if(d2<t2){
+                newBucketID = std::max((int)(bucketID2 - (t2-d2)/t2*zeroDistancePenalty),0);
+                if(bucketID2 != newBucketID){
+                  buckets[newBucketID].insert(*it_cand);
+                  doDelete = true;
+                }
               }
-            }
-            if(doDelete){
-              buckets[bucketID2].erase(it_cand++);
-            } else {
-              ++it_cand;
+              if(doDelete){
+                buckets[bucketID2].erase(it_cand++);
+              } else {
+                ++it_cand;
+              }
             }
           }
         }
