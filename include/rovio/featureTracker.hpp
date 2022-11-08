@@ -231,17 +231,17 @@ class FeatureTrackerNode{
       FeatureCoordinatesVec candidates;
       ROS_INFO_STREAM(" Adding keypoints");
       const double t1 = (double) cv::getTickCount();
-      for(int l=l1;l<=l2;l++){
-        pyr_.detectFastCorners(candidates,l,detectionThreshold);
-      }
+      // for(int l=l1;l<=l2;l++){
+      //   pyr_.detectFastCorners(candidates,l,detectionThreshold);
+      // }
       const double t2 = (double) cv::getTickCount();
       ROS_INFO_STREAM(" == Detected " << candidates.size() << " on levels " << l1 << "-" << l2 << " (" << (t2-t1)/cv::getTickFrequency()*1000 << " ms)");
 //      pruneCandidates(fsm_,candidates,0);
       const double t3 = (double) cv::getTickCount();
 //      ROS_INFO_STREAM(" == Selected " << candidates.size() << " candidates (" << (t3-t2)/cv::getTickFrequency()*1000 << " ms)");
-      std::unordered_set<unsigned int> newSet = fsm_.addBestCandidates( candidates,pyr_,0,current_time,
-                                                                        l1,l2,max_feature_count_,nDetectionBuckets_, scoreDetectionExponent_,
-                                                                        penaltyDistance_, zeroDistancePenalty_,true,0.0);
+      std::unordered_set<unsigned int> newSet;// = fsm_.addBestCandidates( candidates,pyr_,0,current_time,
+                                                                        // l1,l2,max_feature_count_,nDetectionBuckets_, scoreDetectionExponent_,
+                                                                        // penaltyDistance_, zeroDistancePenalty_,true,0.0);
       const double t4 = (double) cv::getTickCount();
       ROS_INFO_STREAM(" == Got " << fsm_.getValidCount() << " after adding " << newSet.size() << " features (" << (t4-t3)/cv::getTickFrequency()*1000 << " ms)");
       for(auto it = newSet.begin();it != newSet.end();++it){

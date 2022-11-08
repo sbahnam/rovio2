@@ -29,7 +29,7 @@
 #ifndef ROVIO_IMGUPDATE_HPP_
 #define ROVIO_IMGUPDATE_HPP_
 
-#define CHECK_GENERATE_MATRICES
+// #define CHECK_GENERATE_MATRICES
 
 #include "lightweight_filtering/common.hpp"
 #include "lightweight_filtering/Update.hpp"
@@ -246,6 +246,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   mutable FeatureCoordinates alignedCoordinates_;
   mutable FeatureCoordinates tempCoordinates_;
   mutable FeatureCoordinatesVec candidates_;
+  mutable std::vector<uint8_t> fast_scores_;
   mutable cv::Point2f c_temp_;
   mutable Eigen::Matrix2d c_J_;
   mutable Eigen::Matrix2d A_red_;
@@ -984,18 +985,20 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
       for(int camID = 0;camID<mtState::nCam_;camID++){
         // Get Candidates
         if(verbose_) std::cout << "Adding keypoints" << std::endl;
-        const double t1 = (double) cv::getTickCount();
+        // const double t1 = (double) cv::getTickCount();
         candidates_.clear();
-        for(int l=endLevel_;l<=startLevel_;l++){
-          meas.aux().pyr_[camID].detectFastCorners(candidates_,l,fastDetectionThreshold_, mpMultiCamera_->cameras_[camID].valid_radius_);
+        fast_scores_.clear();
+        for(int l=startLevel_;l<=startLevel_;l++){
+          // int l=endLevel_;
+          meas.aux().pyr_[camID].detectFastCorners(candidates_,fast_scores_,l,fastDetectionThreshold_, mpMultiCamera_->cameras_[camID].valid_radius_);
         }
-        const double t2 = (double) cv::getTickCount();
-        if(verbose_) std::cout << "== Detected " << candidates_.size() << " on levels " << endLevel_ << "-" << startLevel_ << " (" << (t2-t1)/cv::getTickFrequency()*1000 << " ms)" << std::endl;
-        std::unordered_set<unsigned int> newSet = filterState.fsm_.addBestCandidates(candidates_,meas.aux().pyr_[camID],camID,filterState.t_,
+        // const double t2 = (double) cv::getTickCount();
+        // if(verbose_) std::cout << "== Detected " << candidates_.size() << " on levels " << endLevel_ << "-" << startLevel_ << " (" << (t2-t1)/cv::getTickFrequency()*1000 << " ms)" << std::endl;
+        std::unordered_set<unsigned int> newSet = filterState.fsm_.addBestCandidates(candidates_,fast_scores_,meas.aux().pyr_[camID],camID,filterState.t_,
                                                                     endLevel_,startLevel_,(mtState::nMax_-filterState.fsm_.getValidCount())/(mtState::nCam_-camID),nDetectionBuckets_, scoreDetectionExponent_,
                                                                     penaltyDistance_, zeroDistancePenalty_,false,minAbsoluteSTScore_);
-        const double t3 = (double) cv::getTickCount();
-        if(verbose_) std::cout << "== Got " << filterState.fsm_.getValidCount() << " after adding " << newSet.size() << " features in camera " << camID << " (" << (t3-t2)/cv::getTickFrequency()*1000 << " ms)" << std::endl;
+        // const double t3 = (double) cv::getTickCount();
+        // if(verbose_) std::cout << "== Got " << filterState.fsm_.getValidCount() << " after adding " << newSet.size() << " features in camera " << camID << " (" << (t3-t2)/cv::getTickFrequency()*1000 << " ms)" << std::endl;
         for(auto it = newSet.begin();it != newSet.end();++it){
           FeatureManager<mtState::nLevels_,mtState::patchSize_,mtState::nCam_>& f = filterState.fsm_.features_[*it];
           f.mpStatistics_->resetStatistics(filterState.t_);
