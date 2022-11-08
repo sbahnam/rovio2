@@ -15,24 +15,24 @@ To check the difference between original ROVIO and sparse ROVIO with Eigen::isAp
 
 
 For computation time logging (do not forget to change directory name)
-#define IMG_CALLBACK_LOG in RovioNode.hpp
-#define TIME_LOG in RovioNode.hpp
-#define UPDATELOG in Update.hpp
-#define UPDATELOG_PER_FRAME in Update.hpp
+*#define IMG_CALLBACK_LOG in RovioNode.hpp
+*#define TIME_LOG in RovioNode.hpp
+*#define UPDATELOG in Update.hpp
+*#define UPDATELOG_PER_FRAME in Update.hpp
 
 To save the VIO estimate in a text file (do not forget to change directory name)
-#define SAVE_VIO_TO_TXT in RovioNoe.hpp
+*#define SAVE_VIO_TO_TXT in RovioNoe.hpp
 
 If you change the number of features, currently you have to modify Prediction.hpp because the sparse matrix multiplication is hard coded. We will update late, so you won't have to worry about it. (You can change the number features in CMakeLists.txt)
 
 For EuRoC:
-in RovioNode.hpp subrscribe to cam0/image_raw and imu0
-set the camera buffer and IMU buffer to your preference. Make the IMU buffer at least 200 times bigger than the camera buffer (else your prediction step will be incorrect).
-use roslaunch rovio  rovio_node.launch
+*in RovioNode.hpp subrscribe to cam0/image_raw and imu0
+*set the camera buffer and IMU buffer to your preference. Make the IMU buffer at least 200 times bigger than the camera buffer (else your prediction step will be incorrect).
+*use roslaunch rovio  rovio_node.launch
 
 For the UZH-FPV drone racing dataset use:
-in RovioNode.hpp subrscribe to /snappy_cam/stereo_l and /snappy_imu
-use roslaunch rovio  rovio_node_uzhfpv.launch
+*in RovioNode.hpp subrscribe to /snappy_cam/stereo_l and /snappy_imu
+*use roslaunch rovio  rovio_node_uzhfpv.launch
 
 
 ### ROVIO ###
