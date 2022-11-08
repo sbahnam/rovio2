@@ -7,6 +7,8 @@ These modifications has been presented at IMAV 2022:
 by S.A. Bahnam, C. de Wagter, and G.C.H.E de Croon
 from Delft University of Technology, Kluyverweg 1, Delft
 
+Furthermore, we use the FAST score instead of the Shi-Tomasi score for feature selection. We only detect features on 1/4 image size (instead 1/2 and 1/4). When many features candidates are detected (more than 250) the 150 features with the highest FAST score are pre-selected. With those modifications we were able to run ROVIO on a RPI Zero 2 W with the original number of features (25). However, when reducing the number of features to 15 it is more stable as it processes more frames. It is important to reduce the camera buffer (to 1), so it does not run out of the 512 MB RAM. We also recommend to disable SWAP memory (with sudo dphys-swapfile swapoff).
+
 ### New Parameters and Defintions ###
 To check the difference between original ROVIO and sparse ROVIO with Eigen::isApprox()
 * #define CHECK_GENERATE_MATRICES in ImgUpdate.hpp
