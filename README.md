@@ -1,12 +1,13 @@
 # README #
 
 ### Modifications to ROVIO in this fork ###
-The main changes is that we use sparse matrix multiplications in the state prediction and update step of the IEKF. The sparsity of the prediction step could be derived from the EOMs. For the update step, the Jacobian is essentially a 2x2 matrix, (QR decompositon of image gradient and light condition params), using this 2x2 matrix instead of (2x21+3*max_features) allows to reduce the computational cost of many steps in the update step of the IEKF. Furthermore, we did some clean up of unnecessary computation (for example, calculating the same image gradient at every iteration, instead of just once per feature, per frame). This resulted in a computational cost reduction of 40%, using the original settings on an Nvidia Jetson TX2. 
-These modifications will be presented at IMAV 2022:
+The first main change is that we use sparse matrix multiplications in the state prediction and update step of the IEKF. The sparsity of the prediction step could be derived from the EOMs. For the update step, the Jacobian is essentially a 2x2 matrix, (QR decompositon of image gradient and light condition params), using this 2x2 matrix instead of (2x21+3*max_features) allows to reduce the computational cost of many steps in the update step of the IEKF. Furthermore, we did some clean up of unnecessary computation. This resulted in a computational cost reduction of 40%, using the original settings on an Nvidia Jetson TX2. 
+These modifications has been presented at IMAV 2022:
 "Improving the computational efficiency of ROVIO"
 by S.A. Bahnam, C. de Wagter, and G.C.H.E de Croon
 from Delft University of Technology, Kluyverweg 1, Delft
 
+Secondly, we use a cheaper feature selection method that reduces the computational peaks of the algorithm. Use git checkout sparse_rovio to get the code where we make ROVIO computationally more efficient without affecting the accuracy and use git checkout fast_rovio to get the code where we also use the cheap fature selection method.
 
 
 ### ROVIO ###
