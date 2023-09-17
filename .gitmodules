@@ -2,3 +2,6 @@
 	path = lightweight_filtering
 	url = git@github.com:sbahnam/maplab_lightweight_filtering.git
         branch = ROVIO_faster
+[submodule "kindr"]
+	path = kindr
+	url = https://github.com/ANYbotics/kindr.git
