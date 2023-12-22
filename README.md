@@ -1,30 +1,29 @@
 # README #
 
 ### Building
-git checkout fast_bare_bones
-git submodule update --init
-mkdir build
-cd build
-cmake ..
-make -j4
+* git checkout fast_bare_bones
+* git submodule update --init
+* mkdir build
+* cd build
+* cmake ..
+* make -j4
 
 
 ### How to use it for your camera
-in rovio_node.cpp the node is created (rovio::RovioNode<mtFilter> node(mpFilter);)
-then with each new frame or imu message you should call the callbacks: node.imgCallback(img, msg_time);and node.imuCallback(acc, gyro, imuStmp*1e-9);
-for now it coded to load the images in the example folder with the imu messages
-
-
-The settings for ROVIO can be adjusted in cfg/rovio.info
-    std::string filter_config = rootdir + "/cfg/rovio.info";
-    mpFilter->readFromInfo(filter_config);
-The camera callibartion should be done with Kalibr (https://github.com/ethz-asl/kalibr) or at least be in the same format. (I am not sure, but I thought the old docker works, ubuntu 16 or 18, while the newer one does not)
-Then the output of the callbiaration (yaml file) should be put in cfg folder and the camera_config name should be changed in rovio_node.cpp
-    // Load camera calibration files
-    std::string camera_config = rootdir + "/cfg/euroc_cam0.yaml"; // change this here to your .yaml
-    mpFilter->cameraCalibrationFile_[0] = camera_config;
-    mpFilter->refreshProperties();
-
+in rovio_node.cpp the node is created (rovio::RovioNode<mtFilter> node(mpFilter);)  
+then with each new frame or imu message you should call the callbacks: node.imgCallback(img, msg_time);and node.imuCallback(acc, gyro, imuStmp*1e-9);  
+for now it coded to load the images in the example folder with the imu messages  
+  
+The settings for ROVIO can be adjusted in cfg/rovio.info  
+    std::string filter_config = rootdir + "/cfg/rovio.info";  
+    mpFilter->readFromInfo(filter_config);  
+The camera callibartion should be done with Kalibr (https://github.com/ethz-asl/kalibr) or at least be in the same format. (I am not sure, but I thought the old docker works, ubuntu 16 or 18, while the newer one does not)  
+Then the output of the callbiaration (yaml file) should be put in cfg folder and the camera_config name should be changed in rovio_node.cpp  
+    // Load camera calibration files  
+    std::string camera_config = rootdir + "/cfg/euroc_cam0.yaml"; // change this here to your .yaml  
+    mpFilter->cameraCalibrationFile_[0] = camera_config;  
+    mpFilter->refreshProperties();  
+  
 
 
 
