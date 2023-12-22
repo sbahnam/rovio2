@@ -1,5 +1,33 @@
 # README #
 
+### Building
+git checkout fast_bare_bones
+git submodule update --init
+mkdir build
+cd build
+cmake ..
+make -j4
+
+
+### How to use it for your camera
+in rovio_node.cpp the node is created (rovio::RovioNode<mtFilter> node(mpFilter);)
+then with each new frame or imu message you should call the callbacks: node.imgCallback(img, msg_time);and node.imuCallback(acc, gyro, imuStmp*1e-9);
+for now it coded to load the images in the example folder with the imu messages
+
+
+The settings for ROVIO can be adjusted in cfg/rovio.info
+    std::string filter_config = rootdir + "/cfg/rovio.info";
+    mpFilter->readFromInfo(filter_config);
+The camera callibartion should be done with Kalibr (https://github.com/ethz-asl/kalibr) or at least be in the same format. (I am not sure, but I thought the old docker works, ubuntu 16 or 18, while the newer one does not)
+Then the output of the callbiaration (yaml file) should be put in cfg folder and the camera_config name should be changed in rovio_node.cpp
+    // Load camera calibration files
+    std::string camera_config = rootdir + "/cfg/euroc_cam0.yaml"; // change this here to your .yaml
+    mpFilter->cameraCalibrationFile_[0] = camera_config;
+    mpFilter->refreshProperties();
+
+
+
+
 ### Modifications to ROVIO in this fork ###
 The main changes is that we use sparse matrix multiplications in the state prediction and update step of the IEKF. The sparsity of the prediction step could be derived from the EOMs. For the update step, the Jacobian is essentially a 2x2 matrix, (QR decompositon of image gradient and light condition params), using this 2x2 matrix instead of (2x21+3*max_features) allows to reduce the computational cost of many steps in the update step of the IEKF. Furthermore, we did some clean up of unnecessary computation (for example, calculating the same image gradient at every iteration, instead of just once per feature, per frame). This resulted in a computational cost reduction of 40%, using the original settings on an Nvidia Jetson TX2. 
 These modifications has been presented at IMAV 2022:
