@@ -29,8 +29,6 @@
 #ifndef FEATURECOORDINATES_HPP_
 #define FEATURECOORDINATES_HPP_
 
-#include "lightweight_filtering/common.hpp"
-#include "lightweight_filtering/State.hpp"
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include "rovio/Camera.hpp"

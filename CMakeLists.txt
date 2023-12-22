@@ -1,6 +1,14 @@
-cmake_minimum_required (VERSION 2.6)
-project(rovio)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -march=native")
+# cmake_minimum_required (VERSION 3.22.1)
+cmake_minimum_required (VERSION 3.18.4) # debian on the pi only has binaries for this version, not 3.22.1. Fingers crossed
+
+project(rovio
+  VERSION 1.0
+  LANGUAGES CXX)
+
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -march=native")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17" ) # not sure if that's good. but was needed for proper filesystem handling in rovio_node.cpp
 #set(CMAKE_CXX_STANDARD 11)
 #set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(ROVIO_NMAXFEATURE 25 CACHE STRING "Number of features for ROVIO")
@@ -14,9 +22,9 @@ add_definitions(-DROVIO_NLEVELS=${ROVIO_NLEVELS})
 add_definitions(-DROVIO_PATCHSIZE=${ROVIO_PATCHSIZE})
 add_definitions(-DROVIO_NPOSE=${ROVIO_NPOSE})
 
-add_subdirectory(lightweight_filtering)
+# add_subdirectory(lightweight_filtering)
 
-##################### Find, include, and compile library #####################
+# ##################### Find, include, and compile library #####################
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 if(0)
 	find_package(OpenMP REQUIRED)
@@ -28,22 +36,7 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 find_package(OpenCV REQUIRED COMPONENTS core highgui imgproc features2d)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
-if(MAKE_SCENE)
-	message(STATUS "Building ROVIO with openGL Scene Visualization")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMAKE_SCENE=1")
-	find_package(GLEW REQUIRED)
-	include_directories(${GLEW_INCLUDE_DIRS})
-
-	find_package(GLUT REQUIRED)
-	include_directories(${GLUT_INCLUDE_DIRS})
-	link_directories(${GLUT_LIBRARY_DIRS})
-	add_definitions(${GLUT_DEFINITIONS})
-
-	find_package(OpenGL REQUIRED)
-	include_directories(${OpenGL_INCLUDE_DIRS})
-	link_directories(${OpenGL_LIBRARY_DIRS})
-	add_definitions(${OpenGL_DEFINITIONS})
-endif()
+include_directories("ext/kindr/include")
 
 find_package(PkgConfig)
 
@@ -58,82 +51,30 @@ else()
 endif()
 
 
-##################### Install ROS stuff #####################
-find_package(catkin REQUIRED COMPONENTS
-	lightweight_filtering
-  	kindr
-	roscpp
-	roslib
-	cv_bridge
-	message_generation
-	nav_msgs
-	geometry_msgs
-	sensor_msgs
-	std_msgs
-	tf
-	rosbag
-)
 
-add_service_files(
-  DIRECTORY srv
-  FILES SrvResetToPose.srv
-)
 
-generate_messages(DEPENDENCIES
-  std_msgs
-  geometry_msgs
-)
+# add_library(${PROJECT_NAME} src/Camera.cpp src/FeatureCoordinates.cpp src/FeatureDistance.cpp)
 
-catkin_package(
-	INCLUDE_DIRS include ${catkin_INCLUDE_DIRS}
-    LIBRARIES ${PROJECT_NAME}
-	CATKIN_DEPENDS
-	lightweight_filtering
-  	kindr
-	roscpp
-	roslib
-	cv_bridge
-	message_runtime
-	nav_msgs
-	geometry_msgs
-	sensor_msgs
-	std_msgs
-	tf
-	rosbag
-  yaml_cpp_catkin
-)
+add_library(${PROJECT_NAME} src/Camera.cpp src/FeatureCoordinates.cpp src/FeatureDistance.cpp)
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/include
+												${PROJECT_SOURCE_DIR}/lightweight_filtering/include)
 
-include_directories(include ${catkin_INCLUDE_DIRS} ${YamlCpp_INCLUDE_DIRS})
-
-if(MAKE_SCENE)
-	add_library(${PROJECT_NAME} src/Camera.cpp src/FeatureCoordinates.cpp src/FeatureDistance.cpp src/Scene.cpp)
-else()
-	add_library(${PROJECT_NAME} src/Camera.cpp src/FeatureCoordinates.cpp src/FeatureDistance.cpp)
-endif()
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${YamlCpp_LIBRARIES} ${OpenMP_EXE_LINKER_FLAGS} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} ${GLEW_LIBRARY} ${OpenCV_LIBRARIES})
-add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} rovio_generate_messages_cpp)
 
 add_executable(rovio_node src/rovio_node.cpp)
-target_link_libraries(rovio_node ${PROJECT_NAME})
 
-add_executable(rovio_rosbag_loader src/rovio_rosbag_loader.cpp)
-target_link_libraries(rovio_rosbag_loader ${PROJECT_NAME})
-add_dependencies(rovio_rosbag_loader ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_include_directories(rovio_node PRIVATE ${PROJECT_SOURCE_DIR}/include
+											${PROJECT_SOURCE_DIR}/lightweight_filtering/include)
+				
 
-add_executable(feature_tracker_node src/feature_tracker_node.cpp)
-target_link_libraries(feature_tracker_node ${PROJECT_NAME})
-add_dependencies(feature_tracker_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(rovio_node ${OpenCV_LIBS}
+								${Eigen3_LIBS}
+								${PROJECT_NAME}
+								${YamlCpp_LIBRARIES})
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gtest/")
-	message(STATUS "Building GTests!")
-	option(BUILD_GTEST "build gtest" ON)
-	#add_subdirectory(gtest gtest)
-	enable_testing()
-	include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
-	add_executable(test_patch src/test_patch.cpp src/Camera.cpp src/FeatureCoordinates.cpp src/FeatureDistance.cpp)
-	target_link_libraries(test_patch gtest_main gtest pthread ${catkin_LIBRARIES} ${YamlCpp_LIBRARIES})
-	add_test(test_patch test_patch)
-	add_executable(test_mlp src/test_mlp.cpp src/Camera.cpp src/FeatureCoordinates.cpp src/FeatureDistance.cpp)
-	target_link_libraries(test_mlp gtest_main gtest pthread ${catkin_LIBRARIES} ${YamlCpp_LIBRARIES})
-	add_test(test_mlp test_mlp)
-endif()
+add_custom_command(
+        TARGET rovio_node POST_BUILD
+        COMMAND cp -R ${CMAKE_SOURCE_DIR}/cfg ${CMAKE_CURRENT_BINARY_DIR}/cfg)
+
+add_custom_command(
+        TARGET rovio_node POST_BUILD
+        COMMAND cp -R ${CMAKE_SOURCE_DIR}/example ${CMAKE_CURRENT_BINARY_DIR}/example)

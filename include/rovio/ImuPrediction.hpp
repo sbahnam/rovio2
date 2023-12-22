@@ -29,10 +29,7 @@
 #ifndef ROVIO_IMUPREDICTION_HPP_
 #define ROVIO_IMUPREDICTION_HPP_
 
-#include "lightweight_filtering/common.hpp"
 #include "lightweight_filtering/Prediction.hpp"
-#include "lightweight_filtering/State.hpp"
-#include "rovio/FilterStates.hpp"
 
 namespace rovio {
 
@@ -161,6 +158,7 @@ class ImuPrediction: public LWF::Prediction<FILTERSTATE>{
   void jacPreviousState(MXD& F, const mtState& state, double dt) const{
     const V3D imuRor = meas_.template get<mtMeas::_gyr>()-state.gyb();
     const V3D dOmega = dt*imuRor;
+
     F.setZero();
     F.template block<3,3>(mtState::template getId<mtState::_pos>(),mtState::template getId<mtState::_pos>()) = M3D::Identity();
     F.template block<3,3>(mtState::template getId<mtState::_pos>(),mtState::template getId<mtState::_vel>()) = -dt*MPD(state.qWM()).matrix();

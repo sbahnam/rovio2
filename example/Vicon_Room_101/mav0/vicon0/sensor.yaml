@@ -1,0 +1,13 @@
+# General sensor definitions.
+sensor_type: pose
+comment: Pose measurement from a Vicon system.
+
+# Sensor extrinsics wrt. the body-frame. This is the transformation of the
+# vicon body origin to the body frame.
+T_BS:
+  cols: 4
+  rows: 4
+  data: [ 0.33638, -0.01749,  0.94156,  0.06901,
+         -0.02078, -0.99972, -0.01114, -0.02781,
+          0.94150, -0.01582, -0.33665, -0.12395,
+              0.0,      0.0,      0.0,      1.0]

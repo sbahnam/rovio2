@@ -33,7 +33,6 @@
 #include "rovio/FeatureDistance.hpp"
 #include "rovio/FeatureStatistics.hpp"
 #include "rovio/MultilevelPatch.hpp"
-#include "rovio/MultiCamera.hpp"
 #include "algorithm"
 #include <tuple>
 #include <list>

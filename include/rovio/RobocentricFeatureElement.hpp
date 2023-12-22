@@ -29,7 +29,6 @@
 #ifndef ROBOCENTRICFEATUREELEMENT_HPP_
 #define ROBOCENTRICFEATUREELEMENT_HPP_
 
-#include "lightweight_filtering/common.hpp"
 #include "rovio/FeatureCoordinates.hpp"
 #include "rovio/FeatureDistance.hpp"
 

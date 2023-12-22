@@ -29,7 +29,6 @@
 #ifndef ROVIO_MULTICAMERA_HPP_
 #define ROVIO_MULTICAMERA_HPP_
 
-#include "lightweight_filtering/common.hpp"
 #include "rovio/Camera.hpp"
 #include "rovio/FeatureCoordinates.hpp"
 

@@ -29,14 +29,9 @@
 #ifndef ROVIO_ROVIO_FILTER_HPP_
 #define ROVIO_ROVIO_FILTER_HPP_
 
-#include "lightweight_filtering/common.hpp"
 #include "lightweight_filtering/FilterBase.hpp"
-#include "rovio/FilterStates.hpp"
 #include "rovio/ImgUpdate.hpp"
-#include "rovio/PoseUpdate.hpp"
-#include "rovio/VelocityUpdate.hpp"
 #include "rovio/ImuPrediction.hpp"
-#include "rovio/MultiCamera.hpp"
 
 namespace rovio {
 /** \brief Class, defining the Rovio Filter.
@@ -45,14 +40,10 @@ namespace rovio {
  */
 template<typename FILTERSTATE>
 class RovioFilter:public LWF::FilterBase<ImuPrediction<FILTERSTATE>,
-                                         ImgUpdate<FILTERSTATE>,
-                                         PoseUpdate<FILTERSTATE,(int)(FILTERSTATE::mtState::nPose_>0)-1,(int)(FILTERSTATE::mtState::nPose_>1)*2-1>,
-                                         VelocityUpdate<FILTERSTATE>>{
+                                         ImgUpdate<FILTERSTATE>>{
  public:
   typedef LWF::FilterBase<ImuPrediction<FILTERSTATE>,
-                          ImgUpdate<FILTERSTATE>,
-                          PoseUpdate<FILTERSTATE,(int)(FILTERSTATE::mtState::nPose_>0)-1,(int)(FILTERSTATE::mtState::nPose_>1)*2-1>,
-                          VelocityUpdate<FILTERSTATE>> Base;
+                          ImgUpdate<FILTERSTATE>> Base;
   using Base::init_;
   using Base::reset;
   using Base::predictionTimeline_;
@@ -84,9 +75,8 @@ class RovioFilter:public LWF::FilterBase<ImuPrediction<FILTERSTATE>,
     subHandlers_.erase("Update0");
     subHandlers_["ImgUpdate"] = &std::get<0>(mUpdates_);
     subHandlers_.erase("Update1");
-    subHandlers_["PoseUpdate"] = &std::get<1>(mUpdates_);
+    // subHandlers_["PoseUpdate"] = &std::get<1>(mUpdates_);
     subHandlers_.erase("Update2");
-    subHandlers_["VelocityUpdate"] = &std::get<2>(mUpdates_);
     boolRegister_.registerScalar("Common.doVECalibration",init_.state_.aux().doVECalibration_);
     intRegister_.registerScalar("Common.depthType",depthTypeInt_);
     for(int camID=0;camID<mtState::nCam_;camID++){
@@ -123,26 +113,26 @@ class RovioFilter:public LWF::FilterBase<ImuPrediction<FILTERSTATE>,
         doubleRegister_.removeScalarByVar(init_.cov_(mtState::template getId<mtState::_poa>(i)+j,mtState::template getId<mtState::_poa>(i)+j));
       }
     }
-    if(std::get<1>(mUpdates_).inertialPoseIndex_>=0){
-      std::get<1>(mUpdates_).doubleRegister_.registerVector("IrIW",init_.state_.poseLin(std::get<1>(mUpdates_).inertialPoseIndex_));
-      std::get<1>(mUpdates_).doubleRegister_.registerQuaternion("qWI",init_.state_.poseRot(std::get<1>(mUpdates_).inertialPoseIndex_));
-      for(int j=0;j<3;j++){
-        std::get<1>(mUpdates_).doubleRegister_.registerScalar("init_cov_IrIW",init_.cov_(mtState::template getId<mtState::_pop>(std::get<1>(mUpdates_).inertialPoseIndex_)+j,mtState::template getId<mtState::_pop>(std::get<1>(mUpdates_).inertialPoseIndex_)+j));
-        std::get<1>(mUpdates_).doubleRegister_.registerScalar("init_cov_qWI",init_.cov_(mtState::template getId<mtState::_poa>(std::get<1>(mUpdates_).inertialPoseIndex_)+j,mtState::template getId<mtState::_poa>(std::get<1>(mUpdates_).inertialPoseIndex_)+j));
-        std::get<1>(mUpdates_).doubleRegister_.registerScalar("pre_cov_IrIW",mPrediction_.prenoiP_(mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_pop>(std::get<1>(mUpdates_).inertialPoseIndex_)+j,mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_pop>(std::get<1>(mUpdates_).inertialPoseIndex_)+j));
-        std::get<1>(mUpdates_).doubleRegister_.registerScalar("pre_cov_qWI",mPrediction_.prenoiP_(mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_poa>(std::get<1>(mUpdates_).inertialPoseIndex_)+j,mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_poa>(std::get<1>(mUpdates_).inertialPoseIndex_)+j));
-      }
-    }
-    if(std::get<1>(mUpdates_).bodyPoseIndex_>=0){
-      std::get<1>(mUpdates_).doubleRegister_.registerVector("MrMV",init_.state_.poseLin(std::get<1>(mUpdates_).bodyPoseIndex_));
-      std::get<1>(mUpdates_).doubleRegister_.registerQuaternion("qVM",init_.state_.poseRot(std::get<1>(mUpdates_).bodyPoseIndex_));
-      for(int j=0;j<3;j++){
-        std::get<1>(mUpdates_).doubleRegister_.registerScalar("init_cov_MrMV",init_.cov_(mtState::template getId<mtState::_pop>(std::get<1>(mUpdates_).bodyPoseIndex_)+j,mtState::template getId<mtState::_pop>(std::get<1>(mUpdates_).bodyPoseIndex_)+j));
-        std::get<1>(mUpdates_).doubleRegister_.registerScalar("init_cov_qVM",init_.cov_(mtState::template getId<mtState::_poa>(std::get<1>(mUpdates_).bodyPoseIndex_)+j,mtState::template getId<mtState::_poa>(std::get<1>(mUpdates_).bodyPoseIndex_)+j));
-        std::get<1>(mUpdates_).doubleRegister_.registerScalar("pre_cov_MrMV",mPrediction_.prenoiP_(mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_pop>(std::get<1>(mUpdates_).bodyPoseIndex_)+j,mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_pop>(std::get<1>(mUpdates_).bodyPoseIndex_)+j));
-        std::get<1>(mUpdates_).doubleRegister_.registerScalar("pre_cov_qVM",mPrediction_.prenoiP_(mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_poa>(std::get<1>(mUpdates_).bodyPoseIndex_)+j,mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_poa>(std::get<1>(mUpdates_).bodyPoseIndex_)+j));
-      }
-    }
+    // if(std::get<1>(mUpdates_).inertialPoseIndex_>=0){
+    //   std::get<1>(mUpdates_).doubleRegister_.registerVector("IrIW",init_.state_.poseLin(std::get<1>(mUpdates_).inertialPoseIndex_));
+    //   std::get<1>(mUpdates_).doubleRegister_.registerQuaternion("qWI",init_.state_.poseRot(std::get<1>(mUpdates_).inertialPoseIndex_));
+    //   for(int j=0;j<3;j++){
+    //     std::get<1>(mUpdates_).doubleRegister_.registerScalar("init_cov_IrIW",init_.cov_(mtState::template getId<mtState::_pop>(std::get<1>(mUpdates_).inertialPoseIndex_)+j,mtState::template getId<mtState::_pop>(std::get<1>(mUpdates_).inertialPoseIndex_)+j));
+    //     std::get<1>(mUpdates_).doubleRegister_.registerScalar("init_cov_qWI",init_.cov_(mtState::template getId<mtState::_poa>(std::get<1>(mUpdates_).inertialPoseIndex_)+j,mtState::template getId<mtState::_poa>(std::get<1>(mUpdates_).inertialPoseIndex_)+j));
+    //     std::get<1>(mUpdates_).doubleRegister_.registerScalar("pre_cov_IrIW",mPrediction_.prenoiP_(mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_pop>(std::get<1>(mUpdates_).inertialPoseIndex_)+j,mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_pop>(std::get<1>(mUpdates_).inertialPoseIndex_)+j));
+    //     std::get<1>(mUpdates_).doubleRegister_.registerScalar("pre_cov_qWI",mPrediction_.prenoiP_(mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_poa>(std::get<1>(mUpdates_).inertialPoseIndex_)+j,mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_poa>(std::get<1>(mUpdates_).inertialPoseIndex_)+j));
+    //   }
+    // }
+    // if(std::get<1>(mUpdates_).bodyPoseIndex_>=0){
+    //   std::get<1>(mUpdates_).doubleRegister_.registerVector("MrMV",init_.state_.poseLin(std::get<1>(mUpdates_).bodyPoseIndex_));
+    //   std::get<1>(mUpdates_).doubleRegister_.registerQuaternion("qVM",init_.state_.poseRot(std::get<1>(mUpdates_).bodyPoseIndex_));
+    //   for(int j=0;j<3;j++){
+    //     std::get<1>(mUpdates_).doubleRegister_.registerScalar("init_cov_MrMV",init_.cov_(mtState::template getId<mtState::_pop>(std::get<1>(mUpdates_).bodyPoseIndex_)+j,mtState::template getId<mtState::_pop>(std::get<1>(mUpdates_).bodyPoseIndex_)+j));
+    //     std::get<1>(mUpdates_).doubleRegister_.registerScalar("init_cov_qVM",init_.cov_(mtState::template getId<mtState::_poa>(std::get<1>(mUpdates_).bodyPoseIndex_)+j,mtState::template getId<mtState::_poa>(std::get<1>(mUpdates_).bodyPoseIndex_)+j));
+    //     std::get<1>(mUpdates_).doubleRegister_.registerScalar("pre_cov_MrMV",mPrediction_.prenoiP_(mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_pop>(std::get<1>(mUpdates_).bodyPoseIndex_)+j,mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_pop>(std::get<1>(mUpdates_).bodyPoseIndex_)+j));
+    //     std::get<1>(mUpdates_).doubleRegister_.registerScalar("pre_cov_qVM",mPrediction_.prenoiP_(mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_poa>(std::get<1>(mUpdates_).bodyPoseIndex_)+j,mtPrediction::mtNoise::template getId<mtPrediction::mtNoise::_poa>(std::get<1>(mUpdates_).bodyPoseIndex_)+j));
+    //   }
+    // }
     int ind;
     for(int i=0;i<FILTERSTATE::mtState::nMax_;i++){
       ind = mtState::template getId<mtState::_fea>(i);
@@ -163,23 +153,18 @@ class RovioFilter:public LWF::FilterBase<ImuPrediction<FILTERSTATE>,
     std::get<0>(mUpdates_).doubleRegister_.removeScalarByVar(std::get<0>(mUpdates_).outlierDetection_.getMahalTh(0));
     std::get<0>(mUpdates_).doubleRegister_.registerScalar("MahalanobisTh",std::get<0>(mUpdates_).outlierDetection_.getMahalTh(0));
     std::get<0>(mUpdates_).outlierDetection_.setEnabledAll(true);
-    std::get<1>(mUpdates_).outlierDetection_.setEnabledAll(true);
+    // std::get<1>(mUpdates_).outlierDetection_.setEnabledAll(true);
     boolRegister_.registerScalar("Common.verbose",std::get<0>(mUpdates_).verbose_);
     mPrediction_.doubleRegister_.removeScalarByStr("alpha");
     mPrediction_.doubleRegister_.removeScalarByStr("beta");
     mPrediction_.doubleRegister_.removeScalarByStr("kappa");
-    boolRegister_.registerScalar("PoseUpdate.doVisualization",init_.plotPoseMeas_);
+    // boolRegister_.registerScalar("PoseUpdate.doVisualization",init_.plotPoseMeas_);
     reset(0.0);
   }
 
   /** \brief Reloads the camera calibration for all cameras and resets the depth map type.
    */
   void refreshProperties(){
-    if(std::get<0>(mUpdates_).useDirectMethod_){
-      init_.mode_ = LWF::ModeIEKF;
-    } else {
-      init_.mode_ = LWF::ModeEKF;
-    }
     for(int camID = 0;camID<mtState::nCam_;camID++){
       if (!cameraCalibrationFile_[camID].empty()) {
         multiCamera_.cameras_[camID].load(cameraCalibrationFile_[camID]);

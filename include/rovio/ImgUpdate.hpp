@@ -28,18 +28,15 @@
 
 #ifndef ROVIO_IMGUPDATE_HPP_
 #define ROVIO_IMGUPDATE_HPP_
+#define with_visual
 
 // #define CHECK_GENERATE_MATRICES
 
-#include "lightweight_filtering/common.hpp"
 #include "lightweight_filtering/Update.hpp"
-#include "lightweight_filtering/State.hpp"
 
-#include "rovio/CoordinateTransform/FeatureOutput.hpp"
 #include "rovio/FilterStates.hpp"
 #include "rovio/Camera.hpp"
 #include "rovio/CoordinateTransform/PixelOutput.hpp"
-#include "rovio/ZeroVelocityUpdate.hpp"
 #include "rovio/MultilevelPatchAlignment.hpp"
 
 namespace rovio {
@@ -208,15 +205,12 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   int minFeatureCountForNoMotionDetection_; /**<Minimum amount of feature for detecting NO image motion*/
   double removalFactor_; /**<Factor for enforcing feature removal if not enough free*/
   double patchRejectionTh_;
-  bool useDirectMethod_;  /**<If true, the innovation term is based directly on pixel intensity errors.
-                              If false, the reprojection error is used for the innovation term.*/
   bool doFrameVisualisation_;
   bool visualizePatches_;
   bool verbose_;
   bool removeNegativeFeatureAfterUpdate_;
   bool isZeroVelocityUpdateEnabled_; /**<Should zero velocity updates be performed*/
   double minTimeForZeroVelocityUpdate_;  /**<Time until zero velocity update get performed if there is no motion*/
-  ZeroVelocityUpdate<FILTERSTATE> zeroVelocityUpdate_; /**<Zero velocity update, directly integrated into the img update*/
   double maxUncertaintyToDepthRatioForDepthInitialization_;
   double updateNoisePix_; /**<Update noise of update pixel, used for indirect case (reprojection error)*/
   double updateNoiseInt_; /**<Update noise of intensity error, used for direct approach*/
@@ -258,7 +252,10 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   mutable Eigen::EigenSolver<Eigen::MatrixXd> candidateGenerationES_;
 
   mutable MultilevelPatchAlignment<mtState::nLevels_,mtState::patchSize_> alignment_; /**<Patch aligner*/
-  mutable cv::Mat drawImg_; /**<Image currently used for drawing*/
+  #define with_visual
+  #ifdef with_visual
+    mutable cv::Mat drawImg_; /**<Image currently used for drawing*/
+  #endif 
 
   /** \brief Constructor.
    *
@@ -282,7 +279,6 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
     scoreDetectionExponent_ = 0.5;
     penaltyDistance_ = 20;
     zeroDistancePenalty_ = nDetectionBuckets_*1.0;
-    useDirectMethod_ = true;
     doFrameVisualisation_ = true;
     visualizePatches_ = false;
     verbose_ = false;
@@ -340,7 +336,6 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
     intRegister_.registerScalar("MotionDetection.minFeatureCountForNoMotionDetection",minFeatureCountForNoMotionDetection_);
     intRegister_.registerScalar("alignMaxUniSample",alignMaxUniSample_);
     boolRegister_.registerScalar("MotionDetection.isEnabled",doVisualMotionDetection_);
-    boolRegister_.registerScalar("useDirectMethod",useDirectMethod_);
     boolRegister_.registerScalar("doFrameVisualisation",doFrameVisualisation_);
     boolRegister_.registerScalar("visualizePatches",visualizePatches_);
     boolRegister_.registerScalar("removeNegativeFeatureAfterUpdate",removeNegativeFeatureAfterUpdate_);
@@ -354,11 +349,6 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
     doubleRegister_.registerScalar("UpdateNoise.int",updateNoiseInt_);
     doubleRegister_.registerScalar("noiseGainForOffCamera",noiseGainForOffCamera_);
     useImprovedJacobian_ = false; // TODO: adapt/test
-    isZeroVelocityUpdateEnabled_ = false;
-    Base::PropertyHandler::registerSubHandler("ZeroVelocityUpdate",zeroVelocityUpdate_);
-    zeroVelocityUpdate_.outlierDetection_.registerToPropertyHandler(&zeroVelocityUpdate_,"MahalanobisTh");
-    zeroVelocityUpdate_.doubleRegister_.registerScalar("minNoMotionTime",minTimeForZeroVelocityUpdate_);
-    zeroVelocityUpdate_.boolRegister_.registerScalar("isEnabled",isZeroVelocityUpdateEnabled_);
     doubleRegister_.removeScalarByStr("alpha");
     doubleRegister_.removeScalarByStr("beta");
     doubleRegister_.removeScalarByStr("kappa");
@@ -377,13 +367,8 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
    */
   void refreshProperties(){
     if(isZeroVelocityUpdateEnabled_) assert(doVisualMotionDetection_);
-    if(useDirectMethod_){
-      updnoiP_.setIdentity();
-      updnoiP_ = updnoiP_*updateNoiseInt_;
-    } else {
-      updnoiP_.setIdentity();
-      updnoiP_ = updnoiP_*updateNoisePix_;
-    }
+    updnoiP_.setIdentity();
+    updnoiP_ = updnoiP_*updateNoiseInt_;
     alignment_.huberNormThreshold_ = static_cast<float>(alignmentHuberNormThreshold_);
     alignment_.computeWeightings(alignmentGaussianWeightingSigma_);
     alignment_.gradientExponent_ = static_cast<float>(alignmentGradientExponent_);
@@ -400,8 +385,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
 
   /** \brief Sets the innovation term.
    *
-   *  \note If \ref useDirectMethod_ is set true, the innovation term is based directly on pixel intensity errors.
-   *  \note If \ref useDirectMethod_ is set false, the reprojection error is used for the innovation term.
+   *  \note the innovation term is based directly on pixel intensity errors.
    *  @param mtInnovation - Class, holding innovation data.
    *  @param state        - Filter %State.
    *  @param noise        - Additive discrete Gaussian noise.
@@ -487,9 +471,11 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
 
     if(!hasConverged_){
       if(verbose_) std::cout << "    \033[31mREJECTED (iterations did no converge)\033[0m" << std::endl;
-      if(mlpTemp1_.isMultilevelPatchInFrame(meas_->aux().pyr_[activeCamID],featureOutput_.c(),startLevel_,false)){
-        featureOutput_.c().drawPoint(drawImg_, cv::Scalar(255,0,0),1.0);
-      }
+      #ifdef with_visual
+        if(mlpTemp1_.isMultilevelPatchInFrame(meas_->aux().pyr_[activeCamID],featureOutput_.c(),startLevel_,false)){
+          featureOutput_.c().drawPoint(drawImg_, cv::Scalar(255,0,0),1.0);
+        }
+      #endif
       return false;
     }
 
@@ -502,7 +488,9 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
       const float avgError = mlpTemp1_.computeAverageDifference(*state.aux().mpCurrentFeature_->mpMultilevelPatch_,endLevel_,startLevel_);
       if(avgError > patchRejectionTh_){
         if(verbose_) std::cout << "    \033[31mREJECTED (error too large: " << avgError << ")\033[0m" << std::endl;
-        featureOutput_.c().drawPoint(drawImg_, cv::Scalar(255,255,0),1.0);
+        #ifdef with_visual
+          featureOutput_.c().drawPoint(drawImg_, cv::Scalar(255,255,0),1.0);
+        #endif
         return false;
       }
 
@@ -521,11 +509,13 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
             const bool isAboveThreshold = (discriminativeSamplingGain_ <= 1.0 & sampleError > patchRejectionTh_)
                 | (discriminativeSamplingGain_ > 1.0 & sampleError > discriminativeSamplingGain_*avgError);
             countAboveThreshold += isAboveThreshold;
-            if(isAboveThreshold){
-              sample.c().drawPoint(drawImg_, cv::Scalar(0,255,0),2.0);
-            } else {
-              sample.c().drawPoint(drawImg_, cv::Scalar(0,0,255),2.0);
-            }
+            #ifdef with_visual
+              if(isAboveThreshold){
+                sample.c().drawPoint(drawImg_, cv::Scalar(0,255,0),2.0);
+              } else {
+                sample.c().drawPoint(drawImg_, cv::Scalar(0,0,255),2.0);
+              }
+            #endif
           }
         }
         if(countAboveThreshold < 2){
@@ -535,14 +525,15 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
       }
     }
 
-    featureOutput_.c().drawPoint(drawImg_, cv::Scalar(0,0,255),1.0);
+    #ifdef with_visual
+      featureOutput_.c().drawPoint(drawImg_, cv::Scalar(0,0,255),1.0);
+    #endif
     return true;
   }
 
   /** \brief Computes the Jacobian for the update step of the filter.
    *
-   *  \note If \ref useDirectMethod_ is set true, the jacobian is set w.r.t. the intensity errors.
-   *  \note If \ref useDirectMethod_ is set false, the jacobian is set w.r.t. the reprojection error.
+   *  \note  the jacobian is set w.r.t. the intensity errors.
    *  @param F     - Jacobian for the update step of the filter.
    *  @param state - Filter state.
    */
@@ -554,19 +545,13 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
     transformFeatureOutputCT_.setOutputCameraID(activeCamID);
     transformFeatureOutputCT_.transformState(state,featureOutput_);
 
-    if(useDirectMethod_){
-      if(alignment_.getLinearAlignEquationsReduced(meas_->aux().pyr_[activeCamID],*state.aux().mpCurrentFeature_->mpMultilevelPatch_,featureOutput_.c(),endLevel_,startLevel_,A_red_,b_red_, itered)){
-        transformFeatureOutputCT_.jacTransform(featureOutputJac_,state);
-        mpMultiCamera_->cameras_[activeCamID].bearingToPixel(featureOutput_.c().get_nor(),c_temp_,c_J_);
-        F = -A_red_*c_J_*featureOutputJac_.template block<2,mtState::D_>(0,0);
-      } else {
-        F.setZero();
-        cancelIteration_ = true;
-      }
-    } else {
+    if(alignment_.getLinearAlignEquationsReduced(meas_->aux().pyr_[activeCamID],*state.aux().mpCurrentFeature_->mpMultilevelPatch_,featureOutput_.c(),endLevel_,startLevel_,A_red_,b_red_, itered)){
       transformFeatureOutputCT_.jacTransform(featureOutputJac_,state);
       mpMultiCamera_->cameras_[activeCamID].bearingToPixel(featureOutput_.c().get_nor(),c_temp_,c_J_);
-      F = -c_J_*featureOutputJac_.template block<2,mtState::D_>(0,0);
+      F = -A_red_*c_J_*featureOutputJac_.template block<2,mtState::D_>(0,0);
+    } else {
+      F.setZero();
+      cancelIteration_ = true;
     }
   }
 
@@ -588,16 +573,20 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
    */
   void commonPreProcess(mtFilterState& filterState, const mtMeas& meas){
     assert(filterState.t_ == meas.aux().imgTime_);
-    for(int i=0;i<mtState::nCam_;i++){
-      if(doFrameVisualisation_){
-        cvtColor(meas.aux().pyr_[i].imgs_[0], filterState.img_[i], cv::COLOR_GRAY2BGR);
+    #ifdef with_visual
+      for(int i=0;i<mtState::nCam_;i++){
+        if(doFrameVisualisation_){
+          cvtColor(meas.aux().pyr_[i].imgs_[0], filterState.img_[i], cv::COLOR_GRAY2BGR);
+        }
       }
-    }
+    #endif
     filterState.imgTime_ = filterState.t_;
     filterState.imageCounter_++;
-    if(visualizePatches_){
-      filterState.patchDrawing_ = cv::Mat::zeros(mtState::nMax_*filterState.drawPS_,(1+2*mtState::nCam_)*filterState.drawPS_,CV_8UC3);
-    }
+    #ifdef with_visual
+      if(visualizePatches_){
+        filterState.patchDrawing_ = cv::Mat::zeros(mtState::nMax_*filterState.drawPS_,(1+2*mtState::nCam_)*filterState.drawPS_,CV_8UC3);
+      }
+    #endif
     filterState.state_.aux().activeFeature_ = 0;
     filterState.state_.aux().activeCameraCounter_ = 0;
 
@@ -665,17 +654,21 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
         FeatureManager<mtState::nLevels_,mtState::patchSize_,mtState::nCam_>& f = filterState.fsm_.features_[ID];
         const int camID = f.mpCoordinates_->camID_;
         const int activeCamID = (activeCamCounter + camID)%mtState::nCam_;
-        drawImg_ = filterState.img_[activeCamID];
+        #ifdef with_visual
+          drawImg_ = filterState.img_[activeCamID];
+        #endif
         if(activeCamCounter==0){
           f.mpStatistics_->increaseStatistics(filterState.t_);
           if(verbose_){
             std::cout << "=========== Feature " << f.idx_ << " ==================================================== " << std::endl;
           }
+          #ifdef with_visual
           // Visualize patch tracking
-          if(visualizePatches_){
-            f.mpMultilevelPatch_->drawMultilevelPatch(filterState.patchDrawing_,cv::Point2i(2,filterState.drawPB_+ID*filterState.drawPS_),1,false);
-            cv::putText(filterState.patchDrawing_,std::to_string(f.idx_),cv::Point2i(2,10+ID*filterState.drawPS_),cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255,255,255));
-          }
+            if(visualizePatches_){
+              f.mpMultilevelPatch_->drawMultilevelPatch(filterState.patchDrawing_,cv::Point2i(2,filterState.drawPB_+ID*filterState.drawPS_),1,false);
+              cv::putText(filterState.patchDrawing_,std::to_string(f.idx_),cv::Point2i(2,10+ID*filterState.drawPS_),cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255,255,255));
+            }
+          #endif
           f.log_prediction_ = *f.mpCoordinates_;
         }
         if(verbose_){
@@ -701,60 +694,34 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
           featureOutput_.c().setPixelCov(pixelOutputCov_);
 
           // Visualization
-          if(doFrameVisualisation_){
-            if(activeCamID==camID){
-              featureOutput_.c().drawEllipse(drawImg_, cv::Scalar(0,175,175), 2.0, true);
-              featureOutput_.c().drawText(drawImg_,std::to_string(f.idx_),cv::Scalar(0,175,175));
-            } else {
-              featureOutput_.c().drawEllipse(drawImg_, cv::Scalar(175,175,0), 2.0, true);
-              featureOutput_.c().drawText(drawImg_,std::to_string(f.idx_),cv::Scalar(175,175,0));
-            }
-          }
-          if(visualizePatches_){
-            if(mlpTemp1_.isMultilevelPatchInFrame(meas.aux().pyr_[activeCamID],featureOutput_.c(),startLevel_,false)){
-              mlpTemp1_.extractMultilevelPatchFromImage(meas.aux().pyr_[activeCamID],featureOutput_.c(),startLevel_,false);
-              mlpTemp1_.drawMultilevelPatch(filterState.patchDrawing_,cv::Point2i(filterState.drawPB_+(1+2*activeCamID)*filterState.drawPS_,filterState.drawPB_+ID*filterState.drawPS_),1,false);
-            }
-          }
-
-          if(useDirectMethod_){
-            if(verbose_) std::cout << "    Do direct update (without alignment)" << std::endl;
-            state.aux().mpCurrentFeature_ = &filterState.fsm_.features_[ID];
-            if(activeCamCounter==0){
-              updnoiP_.setIdentity();
-              updnoiP_ = updnoiP_*updateNoiseInt_;
-            } else {
-              updnoiP_.setIdentity();
-              updnoiP_ = updnoiP_*updateNoiseInt_*noiseGainForOffCamera_;
-            }
-            foundValidMeasurement = true;
-          } else {
-            if(alignment_.align2DAdaptive(alignedCoordinates_,meas.aux().pyr_[activeCamID],*f.mpMultilevelPatch_,featureOutput_.c(),startLevel_,endLevel_,
-                                          alignConvergencePixelRange_,alignCoverageRatio_,alignMaxUniSample_)){
-              if(verbose_) std::cout << "    Found match: " << alignedCoordinates_.get_nor().getVec().transpose() << std::endl;
-              if(mlpTemp1_.isMultilevelPatchInFrame(meas.aux().pyr_[activeCamID],alignedCoordinates_,startLevel_,false)){
-                float avgError = 0.0;
-                if(patchRejectionTh_ >= 0){
-                  mlpTemp1_.extractMultilevelPatchFromImage(meas.aux().pyr_[activeCamID],alignedCoordinates_,startLevel_,false);
-                  avgError = mlpTemp1_.computeAverageDifference(*f.mpMultilevelPatch_,endLevel_,startLevel_);
-                }
-                if(patchRejectionTh_ >= 0 && avgError > patchRejectionTh_){
-                  f.mpStatistics_->status_[activeCamID] = FAILED_ALIGNEMENT;
-                  if(verbose_) std::cout << "    \033[31mREJECTED (error too large)\033[0m" << std::endl;
-                } else {
-                  if(doFrameVisualisation_) alignedCoordinates_.drawPoint(drawImg_, cv::Scalar(255,0,255));
-                  state.aux().feaCoorMeas_[ID] = alignedCoordinates_;
-                  foundValidMeasurement = true;
-                }
+          #ifdef with_visual
+            if(doFrameVisualisation_){
+              if(activeCamID==camID){
+                featureOutput_.c().drawEllipse(drawImg_, cv::Scalar(0,175,175), 2.0, true);
+                featureOutput_.c().drawText(drawImg_,std::to_string(f.idx_),cv::Scalar(0,175,175));
               } else {
-                f.mpStatistics_->status_[activeCamID] = FAILED_ALIGNEMENT;
-                if(verbose_) std::cout << "    \033[31mNot in frame after alignment\033[0m" << std::endl;
+                featureOutput_.c().drawEllipse(drawImg_, cv::Scalar(175,175,0), 2.0, true);
+                featureOutput_.c().drawText(drawImg_,std::to_string(f.idx_),cv::Scalar(175,175,0));
               }
-            } else {
-              f.mpStatistics_->status_[activeCamID] = FAILED_ALIGNEMENT;
-              if(verbose_) std::cout << "    \033[31mNOT FOUND (matching failed)\033[0m" << std::endl;
             }
+            if(visualizePatches_){
+              if(mlpTemp1_.isMultilevelPatchInFrame(meas.aux().pyr_[activeCamID],featureOutput_.c(),startLevel_,false)){
+                mlpTemp1_.extractMultilevelPatchFromImage(meas.aux().pyr_[activeCamID],featureOutput_.c(),startLevel_,false);
+                mlpTemp1_.drawMultilevelPatch(filterState.patchDrawing_,cv::Point2i(filterState.drawPB_+(1+2*activeCamID)*filterState.drawPS_,filterState.drawPB_+ID*filterState.drawPS_),1,false);
+              }
+            }
+          #endif
+
+          if(verbose_) std::cout << "    Do direct update (without alignment)" << std::endl;
+          state.aux().mpCurrentFeature_ = &filterState.fsm_.features_[ID];
+          if(activeCamCounter==0){
+            updnoiP_.setIdentity();
+            updnoiP_ = updnoiP_*updateNoiseInt_;
+          } else {
+            updnoiP_.setIdentity();
+            updnoiP_ = updnoiP_*updateNoiseInt_*noiseGainForOffCamera_;
           }
+          foundValidMeasurement = true;
         }
       }
       if(foundValidMeasurement == false){
@@ -813,66 +780,80 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
 
         // Draw information ellipse
         bool doInformationGainVizualization = false;
-        if(doFrameVisualisation_ && doInformationGainVizualization){
-          MXD F(2,2);
-          F = A_red_;
-          F = F.transpose()*F*1.0/updateNoiseInt_;
-          featureOutput_.c().setPixelCov(F);
-          featureOutput_.c().drawEllipse(drawImg_, cv::Scalar(0,255,0), 10, false);
-          F.setIdentity();
-          F = F.transpose()*F*1.0/updateNoisePix_;
-          featureOutput_.c().setPixelCov(F);
-          featureOutput_.c().drawEllipse(drawImg_, cv::Scalar(0,0,255), 10, false);
-        }
+        #ifdef with_visual
+          if(doFrameVisualisation_ && doInformationGainVizualization){
+            MXD F(2,2);
+            F = A_red_;
+            F = F.transpose()*F*1.0/updateNoiseInt_;
+            featureOutput_.c().setPixelCov(F);
+            featureOutput_.c().drawEllipse(drawImg_, cv::Scalar(0,255,0), 10, false);
+            F.setIdentity();
+            F = F.transpose()*F*1.0/updateNoisePix_;
+            featureOutput_.c().setPixelCov(F);
+            featureOutput_.c().drawEllipse(drawImg_, cv::Scalar(0,0,255), 10, false);
+          }
+        #endif
         filterState.mlpErrorLog_[ID] = alignment_.mlpError_;
 
-        if((filterState.mode_ == LWF::ModeIEKF && successfulUpdate_) || (filterState.mode_ == LWF::ModeEKF && !outlierDetection.isOutlier(0))){
+        if(successfulUpdate_){
           if(mlpTemp1_.isMultilevelPatchInFrame(meas.aux().pyr_[camID],featureOutput_.c(),startLevel_,false)){
             f.mpStatistics_->status_[activeCamID] = TRACKED;
-            if(doFrameVisualisation_) mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,150+(activeCamID == camID)*105,0));
+            #ifdef with_visual
+              if(doFrameVisualisation_) mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,150+(activeCamID == camID)*105,0));
+            #endif
           } else {
             f.mpStatistics_->status_[activeCamID] = FAILED_TRACKING;
-            if(doFrameVisualisation_){
-              mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,0,150+(activeCamID == camID)*105));
-              featureOutput_.c().drawText(drawImg_,"NIF",cv::Scalar(0,0,150+(activeCamID == camID)*105));
-            }
+            #ifdef with_visual
+              if(doFrameVisualisation_){
+                mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,0,150+(activeCamID == camID)*105));
+                featureOutput_.c().drawText(drawImg_,"NIF",cv::Scalar(0,0,150+(activeCamID == camID)*105));
+              }
+            #endif
             if(verbose_) std::cout << "    \033[31mNot in frame after update!\033[0m" << std::endl;
           }
         } else {
           f.mpStatistics_->status_[activeCamID] = FAILED_TRACKING;
           if(outlierDetection.isOutlier(0)){
-            if(doFrameVisualisation_){
-              mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,0,150+(activeCamID == camID)*105));
-              featureOutput_.c().drawText(drawImg_,"MD: " + std::to_string(outlierDetection.getMahalDistance(0)),cv::Scalar(0,0,150+(activeCamID == camID)*105));
-            }
+            #ifdef with_visual
+              if(doFrameVisualisation_){
+                mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,0,150+(activeCamID == camID)*105));
+                featureOutput_.c().drawText(drawImg_,"MD: " + std::to_string(outlierDetection.getMahalDistance(0)),cv::Scalar(0,0,150+(activeCamID == camID)*105));
+              }
+            #endif
             if(verbose_) std::cout << "    \033[31mRecognized as outlier by filter: " << outlierDetection.getMahalDistance(0) << "\033[0m" << std::endl;
           } else if(!hasConverged_){
-            if(doFrameVisualisation_){
-              mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,0,150+(activeCamID == camID)*105));
-              featureOutput_.c().drawText(drawImg_,"INC",cv::Scalar(0,0,150+(activeCamID == camID)*105));
-            }
+            #ifdef with_visual
+              if(doFrameVisualisation_){
+                mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,0,150+(activeCamID == camID)*105));
+                featureOutput_.c().drawText(drawImg_,"INC",cv::Scalar(0,0,150+(activeCamID == camID)*105));
+              }
+            #endif
             if(verbose_) std::cout << "    \033[31mIterations not converged!\033[0m" << std::endl;
           } else {
-            if(doFrameVisualisation_){
-              mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,0,150+(activeCamID == camID)*105));
-              featureOutput_.c().drawText(drawImg_,"PE",cv::Scalar(0,0,150+(activeCamID == camID)*105));
-            }
+            #ifdef with_visual
+              if(doFrameVisualisation_){
+                mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,0,150+(activeCamID == camID)*105));
+                featureOutput_.c().drawText(drawImg_,"PE",cv::Scalar(0,0,150+(activeCamID == camID)*105));
+              }
+            #endif
             if(verbose_) std::cout << "    \033[31mToo large pixel intesity error!\033[0m" << std::endl;
           }
         }
 
         // Visualize patch tracking
-        if(visualizePatches_){
-          if(mlpTemp1_.isMultilevelPatchInFrame(meas.aux().pyr_[activeCamID],featureOutput_.c(),mtState::nLevels_-1,false)){
-            mlpTemp1_.extractMultilevelPatchFromImage(meas.aux().pyr_[activeCamID],featureOutput_.c(),mtState::nLevels_-1,false);
-            mlpTemp1_.drawMultilevelPatch(filterState.patchDrawing_,cv::Point2i(filterState.drawPB_+(2+2*activeCamID)*filterState.drawPS_,filterState.drawPB_+ID*filterState.drawPS_),1,false);
+        #ifdef with_visual
+          if(visualizePatches_){
+            if(mlpTemp1_.isMultilevelPatchInFrame(meas.aux().pyr_[activeCamID],featureOutput_.c(),mtState::nLevels_-1,false)){
+              mlpTemp1_.extractMultilevelPatchFromImage(meas.aux().pyr_[activeCamID],featureOutput_.c(),mtState::nLevels_-1,false);
+              mlpTemp1_.drawMultilevelPatch(filterState.patchDrawing_,cv::Point2i(filterState.drawPB_+(2+2*activeCamID)*filterState.drawPS_,filterState.drawPB_+ID*filterState.drawPS_),1,false);
+            }
+            if(f.mpStatistics_->status_[activeCamID] == TRACKED){
+              cv::rectangle(filterState.patchDrawing_,cv::Point2i((2+2*activeCamID)*filterState.drawPS_,ID*filterState.drawPS_),cv::Point2i((3+2*activeCamID)*filterState.drawPS_-1,(ID+1)*filterState.drawPS_-1),cv::Scalar(0,255,0),1,8,0);
+            } else {
+              cv::rectangle(filterState.patchDrawing_,cv::Point2i((2+2*activeCamID)*filterState.drawPS_,ID*filterState.drawPS_),cv::Point2i((3+2*activeCamID)*filterState.drawPS_-1,(ID+1)*filterState.drawPS_-1),cv::Scalar(0,0,255),1,8,0);
+            }
           }
-          if(f.mpStatistics_->status_[activeCamID] == TRACKED){
-            cv::rectangle(filterState.patchDrawing_,cv::Point2i((2+2*activeCamID)*filterState.drawPS_,ID*filterState.drawPS_),cv::Point2i((3+2*activeCamID)*filterState.drawPS_-1,(ID+1)*filterState.drawPS_-1),cv::Scalar(0,255,0),1,8,0);
-          } else {
-            cv::rectangle(filterState.patchDrawing_,cv::Point2i((2+2*activeCamID)*filterState.drawPS_,ID*filterState.drawPS_),cv::Point2i((3+2*activeCamID)*filterState.drawPS_-1,(ID+1)*filterState.drawPS_-1),cv::Scalar(0,0,255),1,8,0);
-          }
-        }
+        #endif
       }
       activeCamCounter++;
       if(activeCamCounter == mtState::nCam_ || !useCrossCameraMeasurements_){
@@ -922,19 +903,21 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
           }
         }
         // Visualize Quatlity
-        if(visualizePatches_){
-          for(int j=0;j<mtState::nCam_;j++){
-            // Local Quality
-            const double qLQ = f.mpStatistics_->getLocalQuality(j);
-            cv::line(filterState.patchDrawing_,cv::Point2i((2+2*j)*filterState.drawPS_+1,(i+1)*filterState.drawPS_-4),cv::Point2i((2+2*j)*filterState.drawPS_+1+(filterState.drawPS_-3)*qLQ,(i+1)*filterState.drawPS_-4),cv::Scalar(0,255*qLQ,255*(1-qLQ)),2,8,0);
+        #ifdef with_visual
+          if(visualizePatches_){
+            for(int j=0;j<mtState::nCam_;j++){
+              // Local Quality
+              const double qLQ = f.mpStatistics_->getLocalQuality(j);
+              cv::line(filterState.patchDrawing_,cv::Point2i((2+2*j)*filterState.drawPS_+1,(i+1)*filterState.drawPS_-4),cv::Point2i((2+2*j)*filterState.drawPS_+1+(filterState.drawPS_-3)*qLQ,(i+1)*filterState.drawPS_-4),cv::Scalar(0,255*qLQ,255*(1-qLQ)),2,8,0);
+            }
+            const double qALQ = f.mpStatistics_->getAverageLocalQuality();
+            cv::line(filterState.patchDrawing_,cv::Point2i(1,(i+1)*filterState.drawPS_-10),cv::Point2i(1+(filterState.drawPS_-3)*qALQ,(i+1)*filterState.drawPS_-10),cv::Scalar(0,255*qALQ,255*(1-qALQ)),2,8,0);
+            const double qLV = f.mpStatistics_->getJointLocalVisibility();
+            cv::line(filterState.patchDrawing_,cv::Point2i(1,(i+1)*filterState.drawPS_-7),cv::Point2i(1+(filterState.drawPS_-3)*qLV,(i+1)*filterState.drawPS_-7),cv::Scalar(0,255*qLV,255*(1-qLV)),2,8,0);
+            const double qGQ = f.mpStatistics_->getGlobalQuality();
+            cv::line(filterState.patchDrawing_,cv::Point2i(1,(i+1)*filterState.drawPS_-4),cv::Point2i(1+(filterState.drawPS_-3)*qGQ,(i+1)*filterState.drawPS_-4),cv::Scalar(0,255*qGQ,255*(1-qALQ)),2,8,0);
           }
-          const double qALQ = f.mpStatistics_->getAverageLocalQuality();
-          cv::line(filterState.patchDrawing_,cv::Point2i(1,(i+1)*filterState.drawPS_-10),cv::Point2i(1+(filterState.drawPS_-3)*qALQ,(i+1)*filterState.drawPS_-10),cv::Scalar(0,255*qALQ,255*(1-qALQ)),2,8,0);
-          const double qLV = f.mpStatistics_->getJointLocalVisibility();
-          cv::line(filterState.patchDrawing_,cv::Point2i(1,(i+1)*filterState.drawPS_-7),cv::Point2i(1+(filterState.drawPS_-3)*qLV,(i+1)*filterState.drawPS_-7),cv::Scalar(0,255*qLV,255*(1-qLV)),2,8,0);
-          const double qGQ = f.mpStatistics_->getGlobalQuality();
-          cv::line(filterState.patchDrawing_,cv::Point2i(1,(i+1)*filterState.drawPS_-4),cv::Point2i(1+(filterState.drawPS_-3)*qGQ,(i+1)*filterState.drawPS_-4),cv::Scalar(0,255*qGQ,255*(1-qALQ)),2,8,0);
-        }
+        #endif
       }
     }
 
@@ -1009,47 +992,49 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
           initCovFeature_(0,0) = initRelDepthCovTemp_*pow(f.mpDistance_->getParameterDerivative()*f.mpDistance_->getDistance(),2);
           filterState.resetFeatureCovariance(*it,initCovFeature_);
           initCovFeature_(0,0) = initRelDepthCovTemp_;
-          if(doFrameVisualisation_){
-            f.mpCoordinates_->drawPoint(filterState.img_[camID], cv::Scalar(255,0,0));
-            f.mpCoordinates_->drawText(filterState.img_[camID],std::to_string(f.idx_),cv::Scalar(255,0,0));
-          }
-
-          if(mtState::nCam_>1 && doStereoInitialization_){
-            const int otherCam = (camID+1)%mtState::nCam_;
-            transformFeatureOutputCT_.setFeatureID(*it);
-            transformFeatureOutputCT_.setOutputCameraID(otherCam);
-            transformFeatureOutputCT_.transformState(filterState.state_,featureOutput_);
-            if(alignment_.align2DAdaptive(alignedCoordinates_,meas.aux().pyr_[otherCam],*f.mpMultilevelPatch_,featureOutput_.c(),startLevel_,endLevel_,
-                                            alignConvergencePixelRange_,alignCoverageRatio_,alignMaxUniSample_)){
-              bool valid = mlpTemp1_.isMultilevelPatchInFrame(meas.aux().pyr_[otherCam],alignedCoordinates_,startLevel_,false);
-              if(valid && patchRejectionTh_ >= 0){
-                mlpTemp1_.extractMultilevelPatchFromImage(meas.aux().pyr_[otherCam],alignedCoordinates_,startLevel_,false);
-                const float avgError = mlpTemp1_.computeAverageDifference(*f.mpMultilevelPatch_,endLevel_,startLevel_);
-                if(avgError > patchRejectionTh_){
-                  valid = false;
-                }
-              }
-              if(valid == true){
-                if(doFrameVisualisation_){
-                  alignedCoordinates_.drawPoint(filterState.img_[otherCam], cv::Scalar(150,0,0));
-                  alignedCoordinates_.drawText(filterState.img_[otherCam],std::to_string(f.idx_),cv::Scalar(150,0,0));
-                }
-                if(f.mpCoordinates_->getDepthFromTriangulation(alignedCoordinates_,state.qCM(otherCam).rotate(V3D(state.MrMC(camID)-state.MrMC(otherCam))),state.qCM(otherCam)*state.qCM(camID).inverted(), *f.mpDistance_, 0.01)){
-                  filterState.resetFeatureCovariance(*it,initCovFeature_); // TODO: improve
-                }
-              } else {
-                if(doFrameVisualisation_){
-                  alignedCoordinates_.drawPoint(filterState.img_[otherCam], cv::Scalar(0,0,150));
-                  alignedCoordinates_.drawText(filterState.img_[otherCam],std::to_string(f.idx_),cv::Scalar(0,0,150));
-                }
-              }
-            } else {
-              if(doFrameVisualisation_){
-                alignedCoordinates_.drawPoint(filterState.img_[otherCam], cv::Scalar(0,150,0));
-                alignedCoordinates_.drawText(filterState.img_[otherCam],std::to_string(f.idx_),cv::Scalar(0,150,0));
-              }
+          #ifdef with_visual
+            if(doFrameVisualisation_){
+              f.mpCoordinates_->drawPoint(filterState.img_[camID], cv::Scalar(255,0,0));
+              f.mpCoordinates_->drawText(filterState.img_[camID],std::to_string(f.idx_),cv::Scalar(255,0,0));
             }
-          }
+          #endif
+
+          // if(mtState::nCam_>1 && doStereoInitialization_){
+          //   const int otherCam = (camID+1)%mtState::nCam_;
+          //   transformFeatureOutputCT_.setFeatureID(*it);
+          //   transformFeatureOutputCT_.setOutputCameraID(otherCam);
+          //   transformFeatureOutputCT_.transformState(filterState.state_,featureOutput_);
+          //   if(alignment_.align2DAdaptive(alignedCoordinates_,meas.aux().pyr_[otherCam],*f.mpMultilevelPatch_,featureOutput_.c(),startLevel_,endLevel_,
+          //                                   alignConvergencePixelRange_,alignCoverageRatio_,alignMaxUniSample_)){
+          //     bool valid = mlpTemp1_.isMultilevelPatchInFrame(meas.aux().pyr_[otherCam],alignedCoordinates_,startLevel_,false);
+          //     if(valid && patchRejectionTh_ >= 0){
+          //       mlpTemp1_.extractMultilevelPatchFromImage(meas.aux().pyr_[otherCam],alignedCoordinates_,startLevel_,false);
+          //       const float avgError = mlpTemp1_.computeAverageDifference(*f.mpMultilevelPatch_,endLevel_,startLevel_);
+          //       if(avgError > patchRejectionTh_){
+          //         valid = false;
+          //       }
+          //     }
+          //     if(valid == true){
+          //       if(doFrameVisualisation_){
+          //         alignedCoordinates_.drawPoint(filterState.img_[otherCam], cv::Scalar(150,0,0));
+          //         alignedCoordinates_.drawText(filterState.img_[otherCam],std::to_string(f.idx_),cv::Scalar(150,0,0));
+          //       }
+          //       if(f.mpCoordinates_->getDepthFromTriangulation(alignedCoordinates_,state.qCM(otherCam).rotate(V3D(state.MrMC(camID)-state.MrMC(otherCam))),state.qCM(otherCam)*state.qCM(camID).inverted(), *f.mpDistance_, 0.01)){
+          //         filterState.resetFeatureCovariance(*it,initCovFeature_); // TODO: improve
+          //       }
+          //     } else {
+          //       if(doFrameVisualisation_){
+          //         alignedCoordinates_.drawPoint(filterState.img_[otherCam], cv::Scalar(0,0,150));
+          //         alignedCoordinates_.drawText(filterState.img_[otherCam],std::to_string(f.idx_),cv::Scalar(0,0,150));
+          //       }
+          //     }
+          //   } else {
+          //     if(doFrameVisualisation_){
+          //       alignedCoordinates_.drawPoint(filterState.img_[otherCam], cv::Scalar(0,150,0));
+          //       alignedCoordinates_.drawText(filterState.img_[otherCam],std::to_string(f.idx_),cv::Scalar(0,150,0));
+          //     }
+          //   }
+          // }
         }
       }
     }
@@ -1058,11 +1043,13 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
         filterState.fsm_.features_[i].log_previous_ = *filterState.fsm_.features_[i].mpCoordinates_;
       }
     }
-    if (doFrameVisualisation_){
-      for(int i=0;i<mtState::nCam_;i++){
-        drawVirtualHorizon(filterState,i);
+    #ifdef with_visual
+      if (doFrameVisualisation_){
+        for(int i=0;i<mtState::nCam_;i++){
+          drawVirtualHorizon(filterState,i);
+        }
       }
-    }
+    #endif
 
     if(verbose_){
       for(int i=0;i<mtState::nCam_;i++){
@@ -1077,13 +1064,6 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
       filterState.prevPyr_[i] = meas.aux().pyr_[i];
     }
 
-    // Zero Velocity updates if appropriate
-    if(isZeroVelocityUpdateEnabled_
-        && doVisualMotionDetection_ && filterState.state_.aux().timeSinceLastImageMotion_ > minTimeForZeroVelocityUpdate_
-        && filterState.state_.aux().timeSinceLastInertialMotion_ > minTimeForZeroVelocityUpdate_){
-      cv::putText(filterState.img_[0],"Performing Zero Velocity Updates!",cv::Point2f(150,25),cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0,255,255));
-      zeroVelocityUpdate_.performUpdateEKF(filterState,ZeroVelocityUpdateMeas<mtState>());
-    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1093,36 +1073,38 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
    *  @param filterState - Filter state.
    *  @param camID       - ID of the camera, in which image the horizon should be drawn.
    */
-  void drawVirtualHorizon(mtFilterState& filterState, const int camID = 0){
-    typename mtFilterState::mtState& state = filterState.state_;
-    cv::rectangle(filterState.img_[camID],cv::Point2f(0,0),cv::Point2f(82,92),cv::Scalar(50,50,50),-1,8,0);
-    cv::rectangle(filterState.img_[camID],cv::Point2f(0,0),cv::Point2f(80,90),cv::Scalar(100,100,100),-1,8,0);
-    cv::putText(filterState.img_[camID],std::to_string(filterState.imageCounter_),cv::Point2f(5,85),cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255,0,0));
-    cv::Point2f rollCenter = cv::Point2f(40,40);
-    cv::Scalar rollColor1(50,50,50);
-    cv::Scalar rollColor2(200,200,200);
-    cv::Scalar rollColor3(120,120,120);
-    cv::circle(filterState.img_[camID],rollCenter,32,rollColor1,-1,8,0);
-    cv::circle(filterState.img_[camID],rollCenter,30,rollColor2,-1,8,0);
-    Eigen::Vector3d Vg = (state.qCM(camID)*state.qWM().inverted()).rotate(Eigen::Vector3d(0,0,-1));
-    double roll = atan2(Vg(1),Vg(0))-0.5*M_PI;
-    double pitch = acos(Vg.dot(Eigen::Vector3d(0,0,1)))-0.5*M_PI;
-    double pixelFor10Pitch = 5.0;
-    double pitchOffsetAngle = -asin(pitch/M_PI*180.0/10.0*pixelFor10Pitch/30.0);
-    cv::Point2f rollVector1 = 30*cv::Point2f(cos(roll),sin(roll));
-    cv::Point2f rollVector2 = cv::Point2f(25,0);
-    cv::Point2f rollVector3 = cv::Point2f(10,0);
-    std::vector<cv::Point> pts;
-    cv::ellipse2Poly(rollCenter,cv::Size(30,30),0,(roll-pitchOffsetAngle)/M_PI*180,(roll+pitchOffsetAngle)/M_PI*180+180,1,pts);
-    cv::Point *points;
-    points = &pts[0];
-    int nbtab = pts.size();
-    cv::fillPoly(filterState.img_[camID],(const cv::Point**)&points,&nbtab,1,rollColor3);
-    cv::line(filterState.img_[camID],rollCenter+rollVector2,rollCenter+rollVector3,rollColor1, 2);
-    cv::line(filterState.img_[camID],rollCenter-rollVector2,rollCenter-rollVector3,rollColor1, 2);
-    cv::ellipse(filterState.img_[camID],rollCenter,cv::Size(10,10),0,0,180,rollColor1,2,8,0);
-    cv::circle(filterState.img_[camID],rollCenter,2,rollColor1,-1,8,0);
-  }
+  #ifdef with_visual
+    void drawVirtualHorizon(mtFilterState& filterState, const int camID = 0){
+      typename mtFilterState::mtState& state = filterState.state_;
+      cv::rectangle(filterState.img_[camID],cv::Point2f(0,0),cv::Point2f(82,92),cv::Scalar(50,50,50),-1,8,0);
+      cv::rectangle(filterState.img_[camID],cv::Point2f(0,0),cv::Point2f(80,90),cv::Scalar(100,100,100),-1,8,0);
+      cv::putText(filterState.img_[camID],std::to_string(filterState.imageCounter_),cv::Point2f(5,85),cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255,0,0));
+      cv::Point2f rollCenter = cv::Point2f(40,40);
+      cv::Scalar rollColor1(50,50,50);
+      cv::Scalar rollColor2(200,200,200);
+      cv::Scalar rollColor3(120,120,120);
+      cv::circle(filterState.img_[camID],rollCenter,32,rollColor1,-1,8,0);
+      cv::circle(filterState.img_[camID],rollCenter,30,rollColor2,-1,8,0);
+      Eigen::Vector3d Vg = (state.qCM(camID)*state.qWM().inverted()).rotate(Eigen::Vector3d(0,0,-1));
+      double roll = atan2(Vg(1),Vg(0))-0.5*M_PI;
+      double pitch = acos(Vg.dot(Eigen::Vector3d(0,0,1)))-0.5*M_PI;
+      double pixelFor10Pitch = 5.0;
+      double pitchOffsetAngle = -asin(pitch/M_PI*180.0/10.0*pixelFor10Pitch/30.0);
+      cv::Point2f rollVector1 = 30*cv::Point2f(cos(roll),sin(roll));
+      cv::Point2f rollVector2 = cv::Point2f(25,0);
+      cv::Point2f rollVector3 = cv::Point2f(10,0);
+      std::vector<cv::Point> pts;
+      cv::ellipse2Poly(rollCenter,cv::Size(30,30),0,(roll-pitchOffsetAngle)/M_PI*180,(roll+pitchOffsetAngle)/M_PI*180+180,1,pts);
+      cv::Point *points;
+      points = &pts[0];
+      int nbtab = pts.size();
+      cv::fillPoly(filterState.img_[camID],(const cv::Point**)&points,&nbtab,1,rollColor3);
+      cv::line(filterState.img_[camID],rollCenter+rollVector2,rollCenter+rollVector3,rollColor1, 2);
+      cv::line(filterState.img_[camID],rollCenter-rollVector2,rollCenter-rollVector3,rollColor1, 2);
+      cv::ellipse(filterState.img_[camID],rollCenter,cv::Size(10,10),0,0,180,rollColor1,2,8,0);
+      cv::circle(filterState.img_[camID],rollCenter,2,rollColor1,-1,8,0);
+    }
+  #endif
 };
 
 }

@@ -29,7 +29,6 @@
 #ifndef ROVIO_FEATUREOUTPUT_HPP_
 #define ROVIO_FEATUREOUTPUT_HPP_
 
-#include "lightweight_filtering/common.hpp"
 #include "lightweight_filtering/CoordinateTransform.hpp"
 #include "rovio/RobocentricFeatureElement.hpp"
 #include "rovio/MultiCamera.hpp"

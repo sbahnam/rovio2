@@ -29,9 +29,7 @@
 #ifndef ROVIO_POSEUPDATE_HPP_
 #define ROVIO_POSEUPDATE_HPP_
 
-#include "lightweight_filtering/common.hpp"
 #include "lightweight_filtering/Update.hpp"
-#include "lightweight_filtering/State.hpp"
 
 namespace rovio {
 
@@ -279,49 +277,6 @@ class PoseUpdate: public LWF::Update<PoseInnovation,FILTERSTATE,PoseUpdateMeas,P
     G.setZero();
     G.template block<3,3>(mtInnovation::template getId<mtInnovation::_pos>(),mtNoise::template getId<mtNoise::_pos>()) = M3D::Identity();
     G.template block<3,3>(mtInnovation::template getId<mtInnovation::_att>(),mtNoise::template getId<mtNoise::_att>()) = M3D::Identity();
-  }
-  void preProcess(mtFilterState& filterstate, const mtMeas& meas, bool& isFinished){
-    mtState& state = filterstate.state_;
-    isFinished = false;
-    if(!didAlignment_ && doInertialAlignmentAtStart_){
-      // qWI = qWM*qVM^T*qVI;
-      qWI_ = state.qWM()*get_qVM(state).inverted()*meas.att();
-      if(inertialPoseIndex_ >= 0){
-        state.poseRot(inertialPoseIndex_) = qWI_;
-      }
-      // IrIW = IrIV - qWI^T*(WrWM + qWM*MrMV);
-      IrIW_ = meas.pos() - qWI_.inverseRotate(V3D(state.WrWM() + state.qWM().rotate(get_MrMV(state))));
-      if(inertialPoseIndex_ >= 0){
-        state.poseLin(inertialPoseIndex_) = IrIW_;
-      }
-      didAlignment_ = true;
-    }
-
-    // When enabled, scale the configured position covariance by the values in the measurement
-    if(useOdometryCov_){
-      updnoiP_ = defaultUpdnoiP_;
-      updnoiP_ *= meas.measuredCov();
-
-      // When either position or attitude are disabled, we need to make sure that the covariance matrix is block-diagonal,
-      // otherwise the unused covariance block would affect the used one when inverting later on.
-      if (enablePosition_ != enableAttitude_) {
-        updnoiP_.template block<3,3>(mtInnovation::template getId<mtInnovation::_att>(), mtInnovation::template getId<mtInnovation::_pos>()).setZero();
-        updnoiP_.template block<3,3>(mtInnovation::template getId<mtInnovation::_pos>(), mtInnovation::template getId<mtInnovation::_att>()).setZero();
-      }
-    } else {
-      updnoiP_ = defaultUpdnoiP_;
-    }
-    /* std::cout << "Default\n" << defaultUpdnoiP_ << "\n\n"
-              << "Meas\n" << meas.measuredCov() << "\n\n"
-              << "Scaled (" << useOdometryCov_ << ")\n" << updnoiP_ << "\n\n"; */
-  }
-  void postProcess(mtFilterState& filterstate, const mtMeas& meas, const mtOutlierDetection& outlierDetection, bool& isFinished){
-    mtState& state = filterstate.state_;
-    isFinished = true;
-    // WrWC = qWI*(IrIV - qWI^T*qWM*MrMV -IrIW) +qWM*MrMC
-    state.aux().poseMeasLin_ = get_qWI(state).rotate(V3D(meas.pos()-(get_qWI(state).inverted()*state.qWM()).rotate(get_MrMV(state))-get_IrIW(state)))+state.template get<mtState::_att>().rotate(state.MrMC(0));
-    // qCW = qCM*qVM^T*qVI*qWI^T;
-    state.aux().poseMeasRot_ = state.qCM(0)*get_qVM(state).inverted()*meas.att()*get_qWI(state).inverted();
   }
 };
 

@@ -29,14 +29,11 @@
 #ifndef ROVIO_FILTERSTATES_HPP_
 #define ROVIO_FILTERSTATES_HPP_
 
-#include "lightweight_filtering/common.hpp"
 #include "lightweight_filtering/FilterState.hpp"
 #include <map>
 #include <unordered_set>
 #include "CoordinateTransform/FeatureOutput.hpp"
-#include "rovio/RobocentricFeatureElement.hpp"
 #include "rovio/FeatureManager.hpp"
-#include "rovio/MultiCamera.hpp"
 
 namespace rovio {
 

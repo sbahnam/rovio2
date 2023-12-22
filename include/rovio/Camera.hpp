@@ -29,7 +29,6 @@
 #ifndef ROVIO_CAMERA_HPP_
 #define ROVIO_CAMERA_HPP_
 
-#include "lightweight_filtering/common.hpp"
 #include <opencv2/features2d/features2d.hpp>
 #include "lightweight_filtering/State.hpp"
 
