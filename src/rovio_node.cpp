@@ -203,9 +203,6 @@ int main(int argc, char** argv){
               // each time we receive/load a single IMU msg we run the imuCallback, which will put the message in a buffer
               // once the camera and IMU at the same time stamp are available it will do the prediction and update step
               node.imuCallback(acc, gyro, imuStmp*1e-9);
-
-              // sleep is not needed, but it is here anyway to "simulate real time imu data"
-              std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
 
             // here we load the next image if the IMU time stamp > than the image, but this is not a requirement
@@ -221,7 +218,7 @@ int main(int argc, char** argv){
 
               node.imgCallback(img, msg_time);
 
-              // sleep  is again not need but is used to see the visualized frames
+              // sleep  is again not need but is used to see the visualized frames @ 1000/50 = 20Hz
               std::this_thread::sleep_for(std::chrono::milliseconds(50));
               img_procd++;
             }

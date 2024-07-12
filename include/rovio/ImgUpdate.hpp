@@ -517,6 +517,15 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
               }
             #endif
           }
+          if (i==2 && countAboveThreshold == 0)
+          {
+            if(verbose_) std::cout << "    \033[31mEARLY REJECTED (first 2 samples not discriminative )\033[0m" << std::endl;
+            return false;
+          }
+          if (countAboveThreshold == 2)
+          {
+            return true;
+          }
         }
         if(countAboveThreshold < 2){
           if(verbose_) std::cout << "    \033[31mREJECTED (feature location not discriminative enough)\033[0m" << std::endl;
@@ -706,6 +715,8 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
             }
             if(visualizePatches_){
               if(mlpTemp1_.isMultilevelPatchInFrame(meas.aux().pyr_[activeCamID],featureOutput_.c(),startLevel_,false)){
+                // std::cout<<"featureOutput_.c()"<<std::endl;
+                // std::cout<<featureOutput_.c()<<std::endl;
                 mlpTemp1_.extractMultilevelPatchFromImage(meas.aux().pyr_[activeCamID],featureOutput_.c(),startLevel_,false);
                 mlpTemp1_.drawMultilevelPatch(filterState.patchDrawing_,cv::Point2i(filterState.drawPB_+(1+2*activeCamID)*filterState.drawPS_,filterState.drawPB_+ID*filterState.drawPS_),1,false);
               }
